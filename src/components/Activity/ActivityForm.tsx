@@ -5,6 +5,8 @@ import ColorPicker from '../UI/ColorPicker';
 import EmojiPicker from '../UI/EmojiPicker';
 import { Activity } from '../../contexts/DataContext';
 import TagInput from '../UI/TagInput';
+import ActivityAttributesEditor from './ActivityAttributesEditor';
+import type { ActivityAttribute } from '../../types';
 
 const defaultColor = '#4f46e5';
 
@@ -12,16 +14,19 @@ const ActivityForm = ({
   initialActivity,
   onSubmit,
   onCancel,
+  existingCategories,
 }: {
   initialActivity?: Activity;
   onSubmit: (values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => void | Promise<void>;
   onCancel?: () => void;
+  existingCategories: string[];
 }) => {
   const [name, setName] = useState(initialActivity?.name ?? '');
   const [icon, setIcon] = useState(initialActivity?.icon ?? '💧');
   const [color, setColor] = useState(initialActivity?.color ?? defaultColor);
   const [active, setActive] = useState(initialActivity?.active ?? true);
   const [categories, setCategories] = useState<string[]>(initialActivity?.categories ?? []);
+  const [attributes, setAttributes] = useState<ActivityAttribute[]>(initialActivity?.attributes ?? []);
 
   useEffect(() => {
     if (initialActivity) {
@@ -30,19 +35,29 @@ const ActivityForm = ({
       setColor(initialActivity.color);
       setActive(initialActivity.active);
       setCategories(initialActivity.categories ?? []);
+      setAttributes(initialActivity.attributes ?? []);
     }
   }, [initialActivity]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!name.trim()) return;
-    await onSubmit({ name, icon, color, active, categories });
+    const normalizedAttributes = attributes
+      .map((attribute) => ({
+        ...attribute,
+        name: attribute.name.trim(),
+        unit: attribute.unit ? attribute.unit.trim() : null,
+      }))
+      .filter((attribute) => attribute.name.length > 0);
+
+    await onSubmit({ name, icon, color, active, categories, attributes: normalizedAttributes });
     if (!initialActivity) {
       setName('');
       setIcon('💧');
       setColor(defaultColor);
       setActive(true);
       setCategories([]);
+      setAttributes([]);
     }
   };
 
@@ -56,7 +71,9 @@ const ActivityForm = ({
         value={categories}
         onChange={setCategories}
         placeholder="z. B. Gesundheit, Morgenroutine"
+        suggestions={existingCategories}
       />
+      <ActivityAttributesEditor attributes={attributes} onChange={setAttributes} />
       <label className="flex items-center gap-3 text-sm text-slate-200">
         <input
           type="checkbox"

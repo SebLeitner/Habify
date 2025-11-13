@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity, LogEntry } from '../../contexts/DataContext';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
 import TextArea from '../UI/TextArea';
 import { currentDateTimeLocal, toLocalDateTimeInput } from '../../utils/datetime';
+import AttributeValuesForm from './AttributeValuesForm';
+import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 
 const LogForm = ({
   activities,
@@ -13,7 +15,12 @@ const LogForm = ({
 }: {
   activities: Activity[];
   initialLog?: LogEntry;
-  onSubmit: (values: { activityId: string; timestamp: string; note?: string }) => void | Promise<void>;
+  onSubmit: (values: {
+    activityId: string;
+    timestamp: string;
+    note?: string;
+    attributes?: ReturnType<typeof serializeDrafts>;
+  }) => void | Promise<void>;
   onCancel?: () => void;
 }) => {
   const defaultActivityId = activities[0]?.id ?? '';
@@ -22,6 +29,23 @@ const LogForm = ({
     initialLog ? toLocalDateTimeInput(initialLog.timestamp) : currentDateTimeLocal(),
   );
   const [note, setNote] = useState(initialLog?.note ?? '');
+  const [drafts, setDrafts] = useState<AttributeValueDraft[]>(() => {
+    const activity = activities.find((item) => item.id === (initialLog?.activityId ?? defaultActivityId));
+    return activity ? toDrafts(activity.attributes, initialLog?.attributes) : [];
+  });
+
+  const selectedActivity = activities.find((activity) => activity.id === activityId) ?? activities[0];
+
+  useEffect(() => {
+    setDrafts((current) => {
+      const activity = activities.find((item) => item.id === activityId);
+      if (!activity) {
+        return current;
+      }
+      const hasInitialValues = initialLog && initialLog.activityId === activityId ? initialLog.attributes : undefined;
+      return toDrafts(activity.attributes, hasInitialValues);
+    });
+  }, [activityId, activities, initialLog]);
 
   if (!activities.length) {
     return <p className="text-sm text-slate-400">Bitte lege zuerst eine Aktivität an.</p>;
@@ -31,11 +55,18 @@ const LogForm = ({
     event.preventDefault();
     if (!activityId) return;
     const isoTimestamp = new Date(timestamp).toISOString();
-    await onSubmit({ activityId, timestamp: isoTimestamp, note: note.trim() ? note : undefined });
+    const attributeValues = serializeDrafts(drafts);
+    await onSubmit({
+      activityId,
+      timestamp: isoTimestamp,
+      note: note.trim() ? note : undefined,
+      attributes: attributeValues.length ? attributeValues : undefined,
+    });
     if (!initialLog) {
       setActivityId(activities[0]?.id ?? '');
       setTimestamp(currentDateTimeLocal());
       setNote('');
+      setDrafts(selectedActivity ? emptyDrafts(selectedActivity.attributes) : []);
     }
   };
 
@@ -63,6 +94,7 @@ const LogForm = ({
         onChange={(event) => setTimestamp(event.target.value)}
         required
       />
+      <AttributeValuesForm attributes={selectedActivity.attributes} drafts={drafts} onChange={setDrafts} />
       <TextArea label="Notiz" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
       <div className="flex items-center justify-end gap-3">
         {onCancel && (
