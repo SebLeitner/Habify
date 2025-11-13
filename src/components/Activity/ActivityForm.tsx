@@ -4,6 +4,7 @@ import Input from '../UI/Input';
 import ColorPicker from '../UI/ColorPicker';
 import EmojiPicker from '../UI/EmojiPicker';
 import { Activity } from '../../contexts/DataContext';
+import TagInput from '../UI/TagInput';
 
 const defaultColor = '#4f46e5';
 
@@ -20,6 +21,7 @@ const ActivityForm = ({
   const [icon, setIcon] = useState(initialActivity?.icon ?? '💧');
   const [color, setColor] = useState(initialActivity?.color ?? defaultColor);
   const [active, setActive] = useState(initialActivity?.active ?? true);
+  const [categories, setCategories] = useState<string[]>(initialActivity?.categories ?? []);
 
   useEffect(() => {
     if (initialActivity) {
@@ -27,18 +29,20 @@ const ActivityForm = ({
       setIcon(initialActivity.icon);
       setColor(initialActivity.color);
       setActive(initialActivity.active);
+      setCategories(initialActivity.categories ?? []);
     }
   }, [initialActivity]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!name.trim()) return;
-    await onSubmit({ name, icon, color, active });
+    await onSubmit({ name, icon, color, active, categories });
     if (!initialActivity) {
       setName('');
       setIcon('💧');
       setColor(defaultColor);
       setActive(true);
+      setCategories([]);
     }
   };
 
@@ -47,6 +51,12 @@ const ActivityForm = ({
       <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
       <EmojiPicker value={icon} onChange={setIcon} />
       <ColorPicker label="Farbe" value={color} onChange={(event) => setColor(event.target.value)} />
+      <TagInput
+        label="Kategorien"
+        value={categories}
+        onChange={setCategories}
+        placeholder="z. B. Gesundheit, Morgenroutine"
+      />
       <label className="flex items-center gap-3 text-sm text-slate-200">
         <input
           type="checkbox"

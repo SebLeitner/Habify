@@ -3,11 +3,11 @@ import { endOfDay, endOfMonth, endOfWeek, startOfDay, startOfMonth, startOfWeek 
 import LogForm from '../components/Log/LogForm';
 import LogList from '../components/Log/LogList';
 import Button from '../components/UI/Button';
-import Modal from '../components/UI/Modal';
+import Spinner from '../components/UI/Spinner';
 import { LogEntry, useData } from '../contexts/DataContext';
 
 const LogsPage = () => {
-  const { state, addLog, updateLog, deleteLog } = useData();
+  const { state, addLog, updateLog, deleteLog, isLoading, error } = useData();
   const [filter, setFilter] = useState<'day' | 'week' | 'month'>('day');
   const [editing, setEditing] = useState<LogEntry | null>(null);
 
@@ -67,20 +67,20 @@ const LogsPage = () => {
               <option value="month">Dieser Monat</option>
             </select>
           </div>
-          <Modal triggerLabel="Neuer Eintrag" title="Log-Eintrag erstellen">
-            {(close) => (
-              <LogForm
-                activities={state.activities}
-                onSubmit={async (values) => {
-                  await handleCreate(values);
-                  close();
-                }}
-              />
-            )}
-          </Modal>
         </div>
       </header>
-      <LogList logs={filteredLogs} activities={state.activities} onEdit={setEditing} onDelete={handleDelete} />
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
+        <h2 className="mb-4 text-lg font-semibold text-white">Neuen Log-Eintrag speichern</h2>
+        <LogForm activities={state.activities} onSubmit={handleCreate} />
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Spinner label="Lade Logbuch" />
+        </div>
+      ) : (
+        <LogList logs={filteredLogs} activities={state.activities} onEdit={setEditing} onDelete={handleDelete} />
+      )}
       {editing && (
         <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-6">
           <div className="mb-4 flex items-center justify-between">

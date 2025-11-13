@@ -6,28 +6,22 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
 } from 'react';
-import { addDays, startOfDay } from 'date-fns';
-import { nanoid } from 'nanoid';
+import {
+  createActivity,
+  deleteActivity as deleteActivityRequest,
+  deleteLog as deleteLogRequest,
+  listActivities,
+  listLogs,
+  updateActivity as updateActivityRequest,
+  updateLog as updateLogRequest,
+  createLog,
+} from '../api/client';
+import type { Activity, LogEntry } from '../types';
 import { useAuth } from './AuthContext';
 
-export type Activity = {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type LogEntry = {
-  id: string;
-  activityId: string;
-  timestamp: string;
-  note?: string;
-  userId: string;
-};
+export type { Activity, LogEntry } from '../types';
 
 type DataState = {
   activities: Activity[];
@@ -51,6 +45,8 @@ const initialState: DataState = {
 
 const DataContext = createContext<{
   state: DataState;
+  isLoading: boolean;
+  error: string | null;
   addActivity: (input: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateActivity: (id: string, updates: Partial<Activity>) => Promise<void>;
   deleteActivity: (id: string) => Promise<void>;
@@ -91,125 +87,150 @@ const reducer = (state: DataState, action: Action): DataState => {
   }
 };
 
-const mockActivities = [
-  {
-    id: 'act-1',
-    name: 'Trinken',
-    icon: '💧',
-    color: '#0ea5e9',
-    active: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'act-2',
-    name: 'Dehnen',
-    icon: '🤸',
-    color: '#f97316',
-    active: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const createMockLogs = (userId: string): LogEntry[] => {
-  const today = startOfDay(new Date());
-  return mockActivities.flatMap((activity, index) =>
-    Array.from({ length: 5 }).map((_, offset) => ({
-      id: `log-${index}-${offset}`,
-      activityId: activity.id,
-      timestamp: addDays(today, -offset).toISOString(),
-      note: offset % 2 === 0 ? 'Fühlt sich gut an!' : undefined,
-      userId,
-    })),
-  );
-};
-
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      dispatch({ type: 'SET_ACTIVITIES', payload: mockActivities });
-      dispatch({ type: 'SET_LOGS', payload: createMockLogs(user.id) });
-    } else {
+  const loadData = useCallback(async () => {
+    if (!user) {
       dispatch({ type: 'SET_ACTIVITIES', payload: [] });
       dispatch({ type: 'SET_LOGS', payload: [] });
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const [activityResponse, logResponse] = await Promise.all([
+        listActivities(),
+        listLogs({ userId: user.id }),
+      ]);
+      dispatch({ type: 'SET_ACTIVITIES', payload: activityResponse });
+      dispatch({ type: 'SET_LOGS', payload: logResponse });
+      setError(null);
+    } catch (apiError) {
+      console.error('Fehler beim Laden der Daten', apiError);
+      setError(
+        apiError instanceof Error
+          ? apiError.message
+          : 'Daten konnten nicht geladen werden.',
+      );
+    } finally {
+      setIsLoading(false);
     }
   }, [user]);
 
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const addActivity = useCallback(
     async (input: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const now = new Date().toISOString();
-      const newActivity: Activity = {
-        ...input,
-        id: nanoid(),
-        createdAt: now,
-        updatedAt: now,
-      };
-      dispatch({ type: 'ADD_ACTIVITY', payload: newActivity });
+      try {
+        const created = await createActivity(input);
+        dispatch({ type: 'ADD_ACTIVITY', payload: created });
+      } catch (apiError) {
+        console.error('Aktivität konnte nicht erstellt werden', apiError);
+        throw apiError;
+      }
     },
     [],
   );
 
   const updateActivity = useCallback(
     async (id: string, updates: Partial<Activity>) => {
-      const existing = state.activities.find((activity) => activity.id === id);
-      if (!existing) return;
-      dispatch({
-        type: 'UPDATE_ACTIVITY',
-        payload: {
-          ...existing,
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        },
-      });
+      try {
+        const updated = await updateActivityRequest({ id, ...updates });
+        dispatch({ type: 'UPDATE_ACTIVITY', payload: updated });
+      } catch (apiError) {
+        console.error('Aktivität konnte nicht aktualisiert werden', apiError);
+        throw apiError;
+      }
     },
-    [state.activities],
+    [],
   );
 
-  const deleteActivity = useCallback(async (id: string) => {
-    dispatch({ type: 'REMOVE_ACTIVITY', payload: id });
-    dispatch({ type: 'SET_LOGS', payload: state.logs.filter((log) => log.activityId !== id) });
-  }, [state.logs]);
+  const deleteActivity = useCallback(
+    async (id: string) => {
+      try {
+        await deleteActivityRequest(id);
+        dispatch({ type: 'REMOVE_ACTIVITY', payload: id });
+        dispatch({
+          type: 'SET_LOGS',
+          payload: state.logs.filter((log) => log.activityId !== id),
+        });
+      } catch (apiError) {
+        console.error('Aktivität konnte nicht gelöscht werden', apiError);
+        throw apiError;
+      }
+    },
+    [state.logs],
+  );
 
   const addLog = useCallback(
     async (input: Omit<LogEntry, 'id' | 'userId'>) => {
       if (!user) throw new Error('Nicht angemeldet');
-      const newLog: LogEntry = {
-        ...input,
-        id: nanoid(),
-        userId: user.id,
-      };
-      dispatch({ type: 'ADD_LOG', payload: newLog });
+      try {
+        const created = await createLog({ ...input, userId: user.id });
+        dispatch({ type: 'ADD_LOG', payload: created });
+      } catch (apiError) {
+        console.error('Log-Eintrag konnte nicht erstellt werden', apiError);
+        throw apiError;
+      }
     },
     [user],
   );
 
   const updateLog = useCallback(
     async (id: string, updates: Partial<LogEntry>) => {
-      const log = state.logs.find((item) => item.id === id);
-      if (!log) return;
-      dispatch({ type: 'UPDATE_LOG', payload: { ...log, ...updates } });
+      if (!user) throw new Error('Nicht angemeldet');
+      try {
+        const updated = await updateLogRequest({ id, ...updates, userId: user.id });
+        dispatch({ type: 'UPDATE_LOG', payload: updated });
+      } catch (apiError) {
+        console.error('Log-Eintrag konnte nicht aktualisiert werden', apiError);
+        throw apiError;
+      }
     },
-    [state.logs],
+    [user],
   );
 
   const deleteLog = useCallback(
     async (id: string) => {
-      dispatch({ type: 'REMOVE_LOG', payload: id });
+      const existing = state.logs.find((log) => log.id === id);
+      if (!existing) return;
+      try {
+        await deleteLogRequest(id, existing.timestamp);
+        dispatch({ type: 'REMOVE_LOG', payload: id });
+      } catch (apiError) {
+        console.error('Log-Eintrag konnte nicht gelöscht werden', apiError);
+        throw apiError;
+      }
     },
-    [],
+    [state.logs],
   );
 
   const refresh = useCallback(() => {
-    // Platzhalter für zukünftige API-Aktualisierung
-  }, []);
+    loadData();
+  }, [loadData]);
 
   const value = useMemo(
-    () => ({ state, addActivity, updateActivity, deleteActivity, addLog, updateLog, deleteLog, refresh }),
-    [state, addActivity, updateActivity, deleteActivity, addLog, updateLog, deleteLog, refresh],
+    () => ({
+      state,
+      isLoading,
+      error,
+      addActivity,
+      updateActivity,
+      deleteActivity,
+      addLog,
+      updateLog,
+      deleteLog,
+      refresh,
+    }),
+    [state, isLoading, error, addActivity, updateActivity, deleteActivity, addLog, updateLog, deleteLog, refresh],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

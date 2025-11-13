@@ -3,20 +3,7 @@ import { Activity, LogEntry } from '../../contexts/DataContext';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
 import TextArea from '../UI/TextArea';
-
-const toLocalInputValue = (isoDate: string) => {
-  const date = new Date(isoDate);
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60_000);
-  return localDate.toISOString().slice(0, 16);
-};
-
-const nowInputValue = () => {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  const localDate = new Date(now.getTime() - offset * 60_000);
-  return localDate.toISOString().slice(0, 16);
-};
+import { currentDateTimeLocal, toLocalDateTimeInput } from '../../utils/datetime';
 
 const LogForm = ({
   activities,
@@ -29,15 +16,16 @@ const LogForm = ({
   onSubmit: (values: { activityId: string; timestamp: string; note?: string }) => void | Promise<void>;
   onCancel?: () => void;
 }) => {
+  const defaultActivityId = activities[0]?.id ?? '';
+  const [activityId, setActivityId] = useState(initialLog?.activityId ?? defaultActivityId);
+  const [timestamp, setTimestamp] = useState(
+    initialLog ? toLocalDateTimeInput(initialLog.timestamp) : currentDateTimeLocal(),
+  );
+  const [note, setNote] = useState(initialLog?.note ?? '');
+
   if (!activities.length) {
     return <p className="text-sm text-slate-400">Bitte lege zuerst eine Aktivität an.</p>;
   }
-
-  const [activityId, setActivityId] = useState(initialLog?.activityId ?? activities[0]?.id ?? '');
-  const [timestamp, setTimestamp] = useState(
-    initialLog ? toLocalInputValue(initialLog.timestamp) : nowInputValue(),
-  );
-  const [note, setNote] = useState(initialLog?.note ?? '');
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -45,8 +33,8 @@ const LogForm = ({
     const isoTimestamp = new Date(timestamp).toISOString();
     await onSubmit({ activityId, timestamp: isoTimestamp, note: note.trim() ? note : undefined });
     if (!initialLog) {
-      setActivityId(activities[0].id);
-      setTimestamp(nowInputValue());
+      setActivityId(activities[0]?.id ?? '');
+      setTimestamp(currentDateTimeLocal());
       setNote('');
     }
   };

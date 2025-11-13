@@ -1,3 +1,33 @@
+const crypto = require('node:crypto');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const {
+  DynamoDBDocumentClient,
+  ScanCommand,
+  PutCommand,
+  UpdateCommand,
+  DeleteCommand,
+  QueryCommand,
+} = require('@aws-sdk/lib-dynamodb');
+
+const ACTIVITIES_TABLE = process.env.ACTIVITIES_TABLE;
+const LOGS_TABLE = process.env.LOGS_TABLE;
+
+const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+
+const defaultHeaders = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'OPTIONS,POST',
+};
+
+class HttpError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
 const safeParseJson = (value) => {
   if (!value) {
     return undefined;
@@ -6,26 +36,429 @@ const safeParseJson = (value) => {
   try {
     return JSON.parse(value);
   } catch (error) {
-    return value;
+    return undefined;
   }
 };
 
+const normalizePath = (event) => {
+  const rawPath = event?.rawPath ?? event?.requestContext?.http?.path ?? '';
+  const stage = event?.requestContext?.stage;
+  const segments = rawPath.split('/').filter(Boolean);
+  if (stage && segments[0] === stage) {
+    segments.shift();
+  }
+  return `/${segments.join('/')}`;
+};
+
+const respond = (statusCode, body) => ({
+  statusCode,
+  headers: defaultHeaders,
+  body: body ? JSON.stringify(body) : '',
+});
+
+const ensureCategories = (input) => {
+  if (!input) {
+    return [];
+  }
+
+  if (!Array.isArray(input)) {
+    throw new HttpError(400, 'Kategorien müssen als Array übermittelt werden.');
+  }
+
+  const normalized = input
+    .map((category) => (category ?? '').toString().trim())
+    .filter((category) => category.length > 0);
+
+  return Array.from(new Set(normalized));
+};
+
+const sanitizeActivity = (item) => ({
+  id: item.id,
+  name: item.name,
+  icon: item.icon,
+  color: item.color,
+  active: item.active !== false,
+  categories: Array.isArray(item.categories)
+    ? item.categories.map((category) => category.toString())
+    : [],
+  createdAt: item.createdAt ?? new Date().toISOString(),
+  updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
+});
+
+const sanitizeLog = (item) => ({
+  id: item.id,
+  activityId: item.activityId,
+  timestamp: item.timestamp,
+  note: item.note ?? undefined,
+  userId: item.userId,
+});
+
+const listActivities = async () => {
+  const result = await dynamoClient.send(
+    new ScanCommand({
+      TableName: ACTIVITIES_TABLE,
+    }),
+  );
+
+  const items = (result.Items ?? [])
+    .map(sanitizeActivity)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return respond(200, { items });
+};
+
+const addActivity = async (payload) => {
+  const name = (payload?.name ?? '').toString().trim();
+  if (!name) {
+    throw new HttpError(400, 'Name der Aktivität ist erforderlich.');
+  }
+
+  const now = new Date().toISOString();
+  const item = {
+    id: crypto.randomUUID(),
+    name,
+    icon: (payload?.icon ?? '💧').toString(),
+    color: (payload?.color ?? '#4f46e5').toString(),
+    active:
+      typeof payload?.active === 'boolean'
+        ? payload.active
+        : payload?.active === 'false'
+        ? false
+        : true,
+    categories: ensureCategories(payload?.categories),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await dynamoClient.send(
+    new PutCommand({
+      TableName: ACTIVITIES_TABLE,
+      Item: item,
+    }),
+  );
+
+  return respond(201, { item: sanitizeActivity(item) });
+};
+
+const updateActivity = async (payload) => {
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Aktivitäts-ID fehlt.');
+  }
+
+  const expression = [];
+  const attributeNames = {};
+  const attributeValues = {};
+
+  if (payload?.name !== undefined) {
+    expression.push('#name = :name');
+    attributeNames['#name'] = 'name';
+    attributeValues[':name'] = payload.name.toString().trim();
+  }
+
+  if (payload?.icon !== undefined) {
+    expression.push('#icon = :icon');
+    attributeNames['#icon'] = 'icon';
+    attributeValues[':icon'] = payload.icon.toString();
+  }
+
+  if (payload?.color !== undefined) {
+    expression.push('#color = :color');
+    attributeNames['#color'] = 'color';
+    attributeValues[':color'] = payload.color.toString();
+  }
+
+  if (payload?.active !== undefined) {
+    expression.push('#active = :active');
+    attributeNames['#active'] = 'active';
+    attributeValues[':active'] =
+      typeof payload.active === 'boolean'
+        ? payload.active
+        : payload.active?.toString() === 'false'
+        ? false
+        : true;
+  }
+
+  if (payload?.categories !== undefined) {
+    expression.push('#categories = :categories');
+    attributeNames['#categories'] = 'categories';
+    attributeValues[':categories'] = ensureCategories(payload.categories);
+  }
+
+  expression.push('#updatedAt = :updatedAt');
+  attributeNames['#updatedAt'] = 'updatedAt';
+  attributeValues[':updatedAt'] = new Date().toISOString();
+
+  const updateExpression = `SET ${expression.join(', ')}`;
+
+  const result = await dynamoClient.send(
+    new UpdateCommand({
+      TableName: ACTIVITIES_TABLE,
+      Key: { id },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeNames: attributeNames,
+      ExpressionAttributeValues: attributeValues,
+      ReturnValues: 'ALL_NEW',
+    }),
+  );
+
+  if (!result.Attributes) {
+    throw new HttpError(404, 'Aktivität wurde nicht gefunden.');
+  }
+
+  return respond(200, { item: sanitizeActivity(result.Attributes) });
+};
+
+const deleteActivity = async (payload) => {
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Aktivitäts-ID fehlt.');
+  }
+
+  await dynamoClient.send(
+    new DeleteCommand({
+      TableName: ACTIVITIES_TABLE,
+      Key: { id },
+    }),
+  );
+
+  // Entferne abhängige Logs
+  const relatedLogs = await dynamoClient.send(
+    new QueryCommand({
+      TableName: LOGS_TABLE,
+      IndexName: 'activityId-index',
+      KeyConditionExpression: '#activityId = :activityId',
+      ExpressionAttributeNames: { '#activityId': 'activityId' },
+      ExpressionAttributeValues: { ':activityId': id },
+    }),
+  );
+
+  const deletions = (relatedLogs.Items ?? []).map((log) =>
+    dynamoClient.send(
+      new DeleteCommand({
+        TableName: LOGS_TABLE,
+        Key: { id: log.id, timestamp: log.timestamp },
+      }),
+    ),
+  );
+
+  await Promise.all(deletions);
+
+  return respond(200, { success: true });
+};
+
+const listLogs = async (payload) => {
+  const userId = payload?.userId?.toString();
+  const result = await dynamoClient.send(
+    new ScanCommand({
+      TableName: LOGS_TABLE,
+    }),
+  );
+
+  let items = result.Items ?? [];
+  if (userId) {
+    items = items.filter((item) => item.userId === userId);
+  }
+
+  items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  return respond(200, { items: items.map(sanitizeLog) });
+};
+
+const addLog = async (payload) => {
+  const activityId = payload?.activityId?.toString();
+  const timestamp = payload?.timestamp?.toString();
+  const userId = payload?.userId?.toString();
+
+  if (!activityId || !timestamp || !userId) {
+    throw new HttpError(400, 'Aktivität, Zeitpunkt und Benutzer sind erforderlich.');
+  }
+
+  const isoTimestamp = new Date(timestamp).toISOString();
+  const now = new Date().toISOString();
+
+  const item = {
+    id: payload?.id?.toString() ?? crypto.randomUUID(),
+    activityId,
+    timestamp: isoTimestamp,
+    note: payload?.note ? payload.note.toString() : undefined,
+    userId,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await dynamoClient.send(
+    new PutCommand({
+      TableName: LOGS_TABLE,
+      Item: item,
+    }),
+  );
+
+  return respond(201, { item: sanitizeLog(item) });
+};
+
+const findLogById = async (id) => {
+  const result = await dynamoClient.send(
+    new QueryCommand({
+      TableName: LOGS_TABLE,
+      KeyConditionExpression: '#id = :id',
+      ExpressionAttributeNames: { '#id': 'id' },
+      ExpressionAttributeValues: { ':id': id },
+      Limit: 1,
+    }),
+  );
+
+  return result.Items?.[0];
+};
+
+const updateLog = async (payload) => {
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Log-ID fehlt.');
+  }
+
+  const existing = await findLogById(id);
+  if (!existing) {
+    throw new HttpError(404, 'Log-Eintrag wurde nicht gefunden.');
+  }
+
+  const nextTimestamp = payload?.timestamp
+    ? new Date(payload.timestamp.toString()).toISOString()
+    : existing.timestamp;
+  const nextActivityId = payload?.activityId?.toString() ?? existing.activityId;
+  const nextNote =
+    payload?.note === undefined ? existing.note : payload.note ? payload.note.toString() : undefined;
+  const nextUserId = payload?.userId?.toString() ?? existing.userId;
+  const updatedAt = new Date().toISOString();
+
+  if (nextTimestamp !== existing.timestamp) {
+    await dynamoClient.send(
+      new DeleteCommand({
+        TableName: LOGS_TABLE,
+        Key: { id: existing.id, timestamp: existing.timestamp },
+      }),
+    );
+
+    const replacement = {
+      ...existing,
+      activityId: nextActivityId,
+      timestamp: nextTimestamp,
+      note: nextNote,
+      userId: nextUserId,
+      updatedAt,
+    };
+
+    await dynamoClient.send(
+      new PutCommand({
+        TableName: LOGS_TABLE,
+        Item: replacement,
+      }),
+    );
+
+    return respond(200, { item: sanitizeLog(replacement) });
+  }
+
+  const expression = ['#updatedAt = :updatedAt'];
+  const attributeNames = { '#updatedAt': 'updatedAt' };
+  const attributeValues = { ':updatedAt': updatedAt };
+
+  if (nextActivityId !== existing.activityId) {
+    expression.push('#activityId = :activityId');
+    attributeNames['#activityId'] = 'activityId';
+    attributeValues[':activityId'] = nextActivityId;
+  }
+
+  if (payload?.note !== undefined) {
+    expression.push('#note = :note');
+    attributeNames['#note'] = 'note';
+    attributeValues[':note'] = nextNote ?? null;
+  }
+
+  if (nextUserId !== existing.userId) {
+    expression.push('#userId = :userId');
+    attributeNames['#userId'] = 'userId';
+    attributeValues[':userId'] = nextUserId;
+  }
+
+  if (expression.length === 1) {
+    return respond(200, { item: sanitizeLog({ ...existing, updatedAt }) });
+  }
+
+  const result = await dynamoClient.send(
+    new UpdateCommand({
+      TableName: LOGS_TABLE,
+      Key: { id: existing.id, timestamp: existing.timestamp },
+      UpdateExpression: `SET ${expression.join(', ')}`,
+      ExpressionAttributeNames: attributeNames,
+      ExpressionAttributeValues: attributeValues,
+      ReturnValues: 'ALL_NEW',
+    }),
+  );
+
+  if (!result.Attributes) {
+    throw new HttpError(500, 'Log-Eintrag konnte nicht aktualisiert werden.');
+  }
+
+  return respond(200, { item: sanitizeLog(result.Attributes) });
+};
+
+const deleteLog = async (payload) => {
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Log-ID fehlt.');
+  }
+
+  let timestamp = payload?.timestamp?.toString();
+  if (!timestamp) {
+    const existing = await findLogById(id);
+    timestamp = existing?.timestamp;
+  }
+
+  if (!timestamp) {
+    throw new HttpError(404, 'Log-Eintrag wurde nicht gefunden.');
+  }
+
+  await dynamoClient.send(
+    new DeleteCommand({
+      TableName: LOGS_TABLE,
+      Key: { id, timestamp },
+    }),
+  );
+
+  return respond(200, { success: true });
+};
+
+const routeHandlers = {
+  '/activities/list': listActivities,
+  '/activities/add': addActivity,
+  '/activities/update': updateActivity,
+  '/activities/delete': deleteActivity,
+  '/logs/list': listLogs,
+  '/logs/add': addLog,
+  '/logs/update': updateLog,
+  '/logs/delete': deleteLog,
+};
+
 exports.handler = async (event) => {
-  const route = event?.requestContext?.http?.path ?? "unknown";
-  const method = event?.requestContext?.http?.method ?? "UNKNOWN";
+  if (event?.requestContext?.http?.method === 'OPTIONS') {
+    return respond(204, null);
+  }
 
-  const response = {
-    message: "Habify API placeholder",
-    route,
-    method,
-    input: safeParseJson(event?.body),
-  };
+  try {
+    const path = normalizePath(event);
+    const handler = routeHandlers[path];
 
-  return {
-    statusCode: 200,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(response),
-  };
+    if (!handler) {
+      throw new HttpError(404, `Route ${path} wurde nicht gefunden.`);
+    }
+
+    const payload = safeParseJson(event?.body);
+    return await handler(payload ?? {});
+  } catch (error) {
+    console.error('API Fehler', error);
+    if (error instanceof HttpError) {
+      return respond(error.statusCode, { message: error.message });
+    }
+    return respond(500, { message: 'Interner Serverfehler' });
+  }
 };

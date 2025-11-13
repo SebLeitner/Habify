@@ -1,9 +1,10 @@
 import Button from '../components/UI/Button';
 import StatsOverview from '../components/Stats/StatsOverview';
+import Spinner from '../components/UI/Spinner';
 import { useData } from '../contexts/DataContext';
 
 const StatsPage = () => {
-  const { state, refresh } = useData();
+  const { state, refresh, isLoading, error } = useData();
 
   return (
     <div className="space-y-6">
@@ -18,7 +19,14 @@ const StatsPage = () => {
           Daten aktualisieren
         </Button>
       </header>
-      <StatsOverview logs={state.logs} activities={state.activities} />
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Spinner label="Lade Statistiken" />
+        </div>
+      ) : (
+        <StatsOverview logs={state.logs} activities={state.activities} />
+      )}
     </div>
   );
 };
