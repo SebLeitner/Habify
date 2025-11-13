@@ -10,17 +10,15 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "lambda_package_path" {
+variable "root_domain" {
   type        = string
-  description = "Pfad zum gezippten Lambda-Paket"
+  description = "Root-Domain in Route 53 (z. B. leitnersoft.com)"
+  default     = "leitnersoft.com"
 }
 
-variable "app_callback_url" {
+variable "app_subdomain" {
   type        = string
-  description = "Callback-URL des SPAs (z. B. https://app.example.com/login/callback)"
+  description = "Subdomain für das Frontend (z. B. habify)"
+  default     = "habify"
 }
 
-variable "app_logout_url" {
-  type        = string
-  description = "Logout-URL des SPAs"
-}
