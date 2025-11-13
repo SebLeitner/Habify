@@ -353,6 +353,14 @@ resource "aws_apigatewayv2_route" "api_routes" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
+resource "aws_apigatewayv2_route" "api_options_routes" {
+  for_each = toset(local.routes)
+
+  api_id    = aws_apigatewayv2_api.habify.id
+  route_key = "OPTIONS ${each.value}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
 resource "aws_apigatewayv2_stage" "prod" {
   api_id = aws_apigatewayv2_api.habify.id
   name   = var.environment
