@@ -53,10 +53,13 @@ Im Verzeichnis `infra/terraform` befindet sich eine vollständige Terraform-Konf
 - Lambda-Funktion (Node.js 20) mit API-Gateway-HTTP-API (v2)
 - IAM-Rollen und Policies
 - CloudWatch-Log-Gruppen
+- Route-53-DNS-Einträge und ACM-Zertifikat für `habify.leitnersoft.de`
+
+> **Hinweis:** Für das automatische DNS-Setup muss die Root-Domain (Standard: `leitnersoft.de`) bereits als öffentliche Hosted Zone in Route 53 existieren.
 
 ### Deployment
 
-1. Erstelle ein ZIP der Lambda-Funktion und definiere den Pfad via `-var="lambda_package_path=pfad/zur/lambda.zip"`.
+1. Stelle sicher, dass der Lambda-Code im Verzeichnis `lambda/` liegt. Terraform erstellt beim Deploy automatisch ein ZIP-Paket.
 2. Führe Terraform-Befehle aus:
 
 ```bash
@@ -64,12 +67,13 @@ cd infra/terraform
 terraform init
 terraform apply \
   -var="environment=dev" \
-  -var="lambda_package_path=../dist/lambda.zip" \
   -var="app_callback_url=https://example.com/callback" \
-  -var="app_logout_url=https://example.com"
+  -var="app_logout_url=https://example.com" \
+  -var="root_domain=leitnersoft.de" \
+  -var="app_subdomain=habify"
 ```
 
-Nach erfolgreicher Bereitstellung liefern die Outputs `cloudfront_url` die CDN-URL, `api_url` die API-Basis sowie `cognito_user_pool_id` und `cognito_user_pool_client_id` die Authentifizierungs-Ressourcen.
+Nach erfolgreicher Bereitstellung ist das Frontend automatisch unter `https://habify.leitnersoft.de` erreichbar (bzw. unter der angegebenen Domain). Die Outputs liefern zusätzlich `cloudfront_url` (CDN-URL), `api_url` (API-Basis), `app_domain` (konfigurierte Domain) sowie `cognito_user_pool_id` und `cognito_user_pool_client_id` für die Authentifizierung.
 
 ## Tests
 

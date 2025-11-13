@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.30"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
   }
 }
 
@@ -12,8 +16,59 @@ provider "aws" {
   region = var.aws_region
 }
 
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
 locals {
-  project_name = "habify"
+  project_name               = "habify"
+  app_domain_name            = "${var.app_subdomain}.${var.root_domain}"
+  lambda_source_dir          = "${path.module}/../../lambda"
+  lambda_package_output_path = "${path.module}/.terraform-artifacts/lambda.zip"
+}
+
+data "archive_file" "lambda" {
+  type        = "zip"
+  source_dir  = local.lambda_source_dir
+  output_path = local.lambda_package_output_path
+}
+
+data "aws_route53_zone" "root" {
+  name         = var.root_domain
+  private_zone = false
+}
+
+resource "aws_acm_certificate" "app" {
+  provider          = aws.us_east_1
+  domain_name       = local.app_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "certificate_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.app.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      record = dvo.resource_record_value
+    }
+  }
+
+  zone_id = data.aws_route53_zone.root.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  ttl     = 60
+  records = [each.value.record]
+}
+
+resource "aws_acm_certificate_validation" "app" {
+  provider                = aws.us_east_1
+  certificate_arn         = aws_acm_certificate.app.arn
+  validation_record_fqdns = [for record in aws_route53_record.certificate_validation : record.fqdn]
 }
 
 resource "aws_s3_bucket" "frontend" {
@@ -61,6 +116,9 @@ resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
   comment             = "Habify Frontend"
   default_root_object = "index.html"
+  aliases             = [local.app_domain_name]
+
+  depends_on = [aws_acm_certificate_validation.app]
 
   origins {
     domain_name = aws_s3_bucket.frontend.bucket_regional_domain_name
@@ -93,7 +151,9 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn            = aws_acm_certificate_validation.app.certificate_arn
+    minimum_protocol_version       = "TLSv1.2_2021"
+    ssl_support_method             = "sni-only"
   }
 
   tags = {
@@ -201,8 +261,8 @@ resource "aws_lambda_function" "api" {
   runtime       = "nodejs20.x"
   role          = aws_iam_role.lambda.arn
 
-  filename         = var.lambda_package_path
-  source_code_hash = filebase64sha256(var.lambda_package_path)
+  filename         = data.archive_file.lambda.output_path
+  source_code_hash = data.archive_file.lambda.output_base64sha256
 
   environment {
     variables = {
@@ -320,12 +380,28 @@ resource "aws_lambda_permission" "api_invoke" {
   source_arn    = "${aws_apigatewayv2_api.habify.execution_arn}/*/*"
 }
 
+resource "aws_route53_record" "frontend" {
+  zone_id = data.aws_route53_zone.root.zone_id
+  name    = local.app_domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.frontend.domain_name
+    zone_id                = aws_cloudfront_distribution.frontend.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
 output "cloudfront_url" {
   value = aws_cloudfront_distribution.frontend.domain_name
 }
 
 output "api_url" {
   value = aws_apigatewayv2_stage.prod.invoke_url
+}
+
+output "app_domain" {
+  value = local.app_domain_name
 }
 
 output "cognito_user_pool_id" {
