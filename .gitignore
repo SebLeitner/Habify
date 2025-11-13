@@ -1,0 +1,8 @@
+node_modules
+.DS_Store
+/dist
+/.idea
+.vscode/
+.env*
+terraform.tfstate*
+infra/terraform/.terraform/
