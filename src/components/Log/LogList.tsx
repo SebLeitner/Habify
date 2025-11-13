@@ -75,7 +75,7 @@ const LogList = ({
   onDelete: (log: LogEntry) => void;
 }) => {
   if (!logs.length) {
-    return <p className="text-sm text-slate-400">Noch keine Einträge im ausgewählten Zeitraum.</p>;
+    return <p className="text-sm text-slate-400">Noch keine Einträge an diesem Tag.</p>;
   }
 
   const activityById = new Map(activities.map((activity) => [activity.id, activity]));

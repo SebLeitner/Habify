@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { endOfDay, endOfMonth, endOfWeek, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
+import { ChangeEvent, useMemo, useState } from 'react';
+import { addDays, endOfDay, format, isAfter, isSameDay, startOfDay } from 'date-fns';
+import { de } from 'date-fns/locale';
 import LogForm from '../components/Log/LogForm';
 import LogList from '../components/Log/LogList';
 import Button from '../components/UI/Button';
@@ -8,28 +9,41 @@ import { LogEntry, useData } from '../contexts/DataContext';
 
 const LogsPage = () => {
   const { state, addLog, updateLog, deleteLog, isLoading, error } = useData();
-  const [filter, setFilter] = useState<'day' | 'week' | 'month'>('day');
+  const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
   const [editing, setEditing] = useState<LogEntry | null>(null);
 
   const filteredLogs = useMemo(() => {
-    const now = new Date();
-    let start = startOfDay(now);
-    let end = endOfDay(now);
-    if (filter === 'week') {
-      start = startOfWeek(now, { weekStartsOn: 1 });
-      end = endOfWeek(now, { weekStartsOn: 1 });
-    }
-    if (filter === 'month') {
-      start = startOfMonth(now);
-      end = endOfMonth(now);
-    }
+    const start = startOfDay(selectedDate);
+    const end = endOfDay(selectedDate);
     return state.logs
       .filter((log) => {
         const date = new Date(log.timestamp);
         return date >= start && date <= end;
       })
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [state.logs, filter]);
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }, [state.logs, selectedDate]);
+
+  const goToPreviousDay = () => {
+    setSelectedDate((current) => startOfDay(addDays(current, -1)));
+  };
+
+  const goToNextDay = () => {
+    setSelectedDate((current) => startOfDay(addDays(current, 1)));
+  };
+
+  const handleDatePickerChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.target;
+    if (!value) return;
+    const nextDate = startOfDay(new Date(value));
+    if (!Number.isNaN(nextDate.getTime())) {
+      setSelectedDate(nextDate);
+    }
+  };
+
+  const formattedDateLabel = format(selectedDate, 'EEEE, dd. MMMM yyyy', { locale: de });
+  const datePickerValue = format(selectedDate, 'yyyy-MM-dd');
+  const today = startOfDay(new Date());
+  const disableNextDay = isSameDay(selectedDate, today) || isAfter(selectedDate, today);
 
   const handleCreate = async (values: {
     activityId: string;
@@ -38,6 +52,10 @@ const LogsPage = () => {
     attributes?: LogEntry['attributes'];
   }) => {
     await addLog(values);
+    const newDate = startOfDay(new Date(values.timestamp));
+    if (!Number.isNaN(newDate.getTime())) {
+      setSelectedDate(newDate);
+    }
   };
 
   const handleUpdate = async (values: {
@@ -48,6 +66,10 @@ const LogsPage = () => {
   }) => {
     if (!editing) return;
     await updateLog(editing.id, values);
+    const updatedDate = startOfDay(new Date(values.timestamp));
+    if (!Number.isNaN(updatedDate.getTime())) {
+      setSelectedDate(updatedDate);
+    }
     setEditing(null);
   };
 
@@ -62,21 +84,42 @@ const LogsPage = () => {
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Logbuch</h1>
-          <p className="text-sm text-slate-400">Dokumentiere deine Aktivitäten und halte Fortschritte fest.</p>
+          <p className="text-sm text-slate-400">
+            Wechsle den Tag mit den Pfeilen oder wähle ein Datum aus, um alle Aktivitäten chronologisch zu sehen.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            Zeitraum
-            <select
-              value={filter}
-              onChange={(event) => setFilter(event.target.value as 'day' | 'week' | 'month')}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
+        <div className="flex flex-col gap-3 text-sm text-slate-300 md:flex-row md:items-center">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={goToPreviousDay}
+              className="px-3 py-2"
+              aria-label="Vorheriger Tag"
             >
-              <option value="day">Heute</option>
-              <option value="week">Diese Woche</option>
-              <option value="month">Dieser Monat</option>
-            </select>
+              ←
+            </Button>
+            <span className="min-w-[200px] text-center text-base font-semibold text-white">{formattedDateLabel}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={goToNextDay}
+              className="px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={disableNextDay}
+              aria-label="Nächster Tag"
+            >
+              →
+            </Button>
           </div>
+          <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-400">
+            Datum wählen
+            <input
+              type="date"
+              value={datePickerValue}
+              onChange={handleDatePickerChange}
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
+            />
+          </label>
         </div>
       </header>
       {error && <p className="text-sm text-red-400">{error}</p>}
