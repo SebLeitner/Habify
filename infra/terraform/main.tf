@@ -24,6 +24,8 @@ provider "aws" {
 locals {
   project_name               = "habify"
   app_domain_name            = "${var.app_subdomain}.${var.root_domain}"
+  app_callback_url           = "https://${local.app_domain_name}/login"
+  app_logout_url             = "https://${local.app_domain_name}/login"
   lambda_source_dir          = "${path.module}/../../lambda"
   lambda_package_output_path = "${path.module}/.terraform-artifacts/lambda.zip"
 }
@@ -310,8 +312,8 @@ resource "aws_cognito_user_pool_client" "habify" {
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
-  callback_urls                        = [var.app_callback_url]
-  logout_urls                          = [var.app_logout_url]
+  callback_urls                        = [local.app_callback_url]
+  logout_urls                          = [local.app_logout_url]
   supported_identity_providers         = ["COGNITO"]
 }
 

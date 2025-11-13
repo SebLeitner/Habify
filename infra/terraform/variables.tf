@@ -12,8 +12,8 @@ variable "environment" {
 
 variable "root_domain" {
   type        = string
-  description = "Root-Domain in Route 53 (z. B. leitnersoft.de)"
-  default     = "leitnersoft.de"
+  description = "Root-Domain in Route 53 (z. B. leitnersoft.com)"
+  default     = "leitnersoft.com"
 }
 
 variable "app_subdomain" {
@@ -22,12 +22,3 @@ variable "app_subdomain" {
   default     = "habify"
 }
 
-variable "app_callback_url" {
-  type        = string
-  description = "Callback-URL des SPAs (z. B. https://app.example.com/login/callback)"
-}
-
-variable "app_logout_url" {
-  type        = string
-  description = "Logout-URL des SPAs"
-}
