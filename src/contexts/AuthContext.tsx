@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type AuthUser = {
   id: string;
@@ -29,31 +29,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const persistUser = (authUser: AuthUser | null) => {
+  const persistUser = useCallback((authUser: AuthUser | null) => {
     if (authUser) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
-  };
+  }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     if (!email || !password) {
       throw new Error('Bitte E-Mail und Passwort angeben.');
     }
     const fakeUser: AuthUser = { id: btoa(email).slice(0, 12), email };
     persistUser(fakeUser);
     setUser(fakeUser);
-  };
+  }, [persistUser]);
 
-  const register = async (email: string, password: string) => {
-    await login(email, password);
-  };
+  const register = useCallback(
+    async (email: string, password: string) => {
+      await login(email, password);
+    },
+    [login],
+  );
 
-  const logout = () => {
+  const logout = useCallback(() => {
     persistUser(null);
     setUser(null);
-  };
+  }, [persistUser]);
 
   const value = useMemo(
     () => ({
@@ -63,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       logout,
       isLoading,
     }),
-    [user, isLoading],
+    [user, login, register, logout, isLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

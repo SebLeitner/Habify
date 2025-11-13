@@ -3,12 +3,22 @@ import ActivityForm from '../components/Activity/ActivityForm';
 import ActivityList from '../components/Activity/ActivityList';
 import Button from '../components/UI/Button';
 import Modal from '../components/UI/Modal';
+import Spinner from '../components/UI/Spinner';
 import { Activity, useData } from '../contexts/DataContext';
 
 const ActivitiesPage = () => {
-  const { state, addActivity, updateActivity, deleteActivity } = useData();
+  const { state, addActivity, updateActivity, deleteActivity, addLog, isLoading, error } = useData();
   const [sort, setSort] = useState<'createdAt' | 'name'>('createdAt');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [editing, setEditing] = useState<Activity | null>(null);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    state.activities.forEach((activity) => {
+      activity.categories?.forEach((category) => set.add(category));
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [state.activities]);
 
   const activities = useMemo(() => {
     const sorted = [...state.activities];
@@ -17,8 +27,11 @@ const ActivitiesPage = () => {
     } else {
       sorted.sort((a, b) => a.name.localeCompare(b.name, 'de')); // alphabetical
     }
-    return sorted;
-  }, [state.activities, sort]);
+    if (!categoryFilter) {
+      return sorted;
+    }
+    return sorted.filter((activity) => activity.categories?.includes(categoryFilter));
+  }, [state.activities, sort, categoryFilter]);
 
   const handleCreate = async (values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => {
     await addActivity(values);
@@ -69,7 +82,48 @@ const ActivitiesPage = () => {
           </Modal>
         </div>
       </header>
-      <ActivityList activities={activities} onEdit={setEditing} onDelete={handleDelete} />
+      {!!categories.length && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setCategoryFilter(null)}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              categoryFilter === null
+                ? 'bg-brand-primary/20 text-brand-secondary'
+                : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+            }`}
+          >
+            Alle
+          </button>
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setCategoryFilter((current) => (current === category ? null : category))}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                categoryFilter === category
+                  ? 'bg-brand-primary/20 text-brand-secondary'
+                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Spinner label="Lade Aktivitäten" />
+        </div>
+      ) : (
+        <ActivityList
+          activities={activities}
+          onEdit={setEditing}
+          onDelete={handleDelete}
+          onAddLog={addLog}
+        />
+      )}
       {editing && (
         <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-6">
           <div className="mb-4 flex items-center justify-between">
