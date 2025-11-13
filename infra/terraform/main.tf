@@ -1,0 +1,337 @@
+terraform {
+  required_version = ">= 1.6.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.30"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+locals {
+  project_name = "habify"
+}
+
+resource "aws_s3_bucket" "frontend" {
+  bucket        = "${local.project_name}-${var.environment}-frontend"
+  force_destroy = true
+
+  tags = {
+    Project     = local.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_s3_bucket_policy" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontOAC"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = ["s3:GetObject"]
+        Resource = ["${aws_s3_bucket.frontend.arn}/*"]
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_cloudfront_origin_access_control" "frontend" {
+  name                              = "${local.project_name}-${var.environment}-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_distribution" "frontend" {
+  enabled             = true
+  comment             = "Habify Frontend"
+  default_root_object = "index.html"
+
+  origins {
+    domain_name = aws_s3_bucket.frontend.bucket_regional_domain_name
+    origin_id   = "s3-frontend"
+
+    origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
+  }
+
+  default_cache_behavior {
+    allowed_methods  = ["GET", "HEAD", "OPTIONS"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "s3-frontend"
+
+    viewer_protocol_policy = "redirect-to-https"
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+  }
+
+  price_class = "PriceClass_100"
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+
+  tags = {
+    Project     = local.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_dynamodb_table" "activities" {
+  name         = "${local.project_name}-${var.environment}-activities"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  tags = {
+    Project     = local.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_dynamodb_table" "logs" {
+  name         = "${local.project_name}-${var.environment}-logs"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+  range_key    = "timestamp"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "activityId-index"
+    hash_key        = "activityId"
+    projection_type = "ALL"
+  }
+
+  attribute {
+    name = "activityId"
+    type = "S"
+  }
+
+  tags = {
+    Project     = local.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role" "lambda" {
+  name = "${local.project_name}-${var.environment}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole"
+        Effect    = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_dynamo" {
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Effect   = "Allow"
+        Resource = [aws_dynamodb_table.activities.arn, aws_dynamodb_table.logs.arn, "${aws_dynamodb_table.logs.arn}/index/activityId-index"]
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "api" {
+  function_name = "${local.project_name}-${var.environment}-api"
+  handler       = "index.handler"
+  runtime       = "nodejs20.x"
+  role          = aws_iam_role.lambda.arn
+
+  filename         = var.lambda_package_path
+  source_code_hash = filebase64sha256(var.lambda_package_path)
+
+  environment {
+    variables = {
+      ACTIVITIES_TABLE = aws_dynamodb_table.activities.name
+      LOGS_TABLE       = aws_dynamodb_table.logs.name
+    }
+  }
+}
+
+resource "aws_cognito_user_pool" "habify" {
+  name = "${local.project_name}-${var.environment}-users"
+
+  password_policy {
+    minimum_length    = 8
+    require_lowercase = true
+    require_numbers   = true
+    require_symbols   = false
+    require_uppercase = false
+  }
+
+  auto_verified_attributes = ["email"]
+
+  schema {
+    name                = "email"
+    attribute_data_type = "String"
+    required            = true
+    mutable             = true
+  }
+
+  tags = {
+    Project     = local.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_cognito_user_pool_client" "habify" {
+  name         = "${local.project_name}-${var.environment}-spa"
+  user_pool_id = aws_cognito_user_pool.habify.id
+
+  explicit_auth_flows = [
+    "ALLOW_USER_SRP_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH",
+  ]
+
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["email", "openid", "profile"]
+  callback_urls                        = [var.app_callback_url]
+  logout_urls                          = [var.app_logout_url]
+  supported_identity_providers         = ["COGNITO"]
+}
+
+resource "aws_apigatewayv2_api" "habify" {
+  name          = "${local.project_name}-${var.environment}-api"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "lambda" {
+  api_id           = aws_apigatewayv2_api.habify.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.api.invoke_arn
+  payload_format_version = "2.0"
+}
+
+locals {
+  routes = [
+    "/activities/add",
+    "/activities/list",
+    "/activities/update",
+    "/activities/delete",
+    "/logs/add",
+    "/logs/list",
+    "/logs/update",
+    "/logs/delete",
+    "/stats/today",
+    "/stats/week",
+    "/stats/month"
+  ]
+}
+
+resource "aws_apigatewayv2_route" "api_routes" {
+  for_each = toset(local.routes)
+
+  api_id    = aws_apigatewayv2_api.habify.id
+  route_key = "POST ${each.value}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_stage" "prod" {
+  api_id = aws_apigatewayv2_api.habify.id
+  name   = var.environment
+  auto_deploy = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      integrationError = "$context.integrationErrorMessage"
+    })
+  }
+}
+
+resource "aws_cloudwatch_log_group" "api" {
+  name              = "/aws/apigateway/${local.project_name}-${var.environment}"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_permission" "api_invoke" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.habify.execution_arn}/*/*"
+}
+
+output "cloudfront_url" {
+  value = aws_cloudfront_distribution.frontend.domain_name
+}
+
+output "api_url" {
+  value = aws_apigatewayv2_stage.prod.invoke_url
+}
+
+output "cognito_user_pool_id" {
+  value = aws_cognito_user_pool.habify.id
+}
+
+output "cognito_user_pool_client_id" {
+  value = aws_cognito_user_pool_client.habify.id
+}
