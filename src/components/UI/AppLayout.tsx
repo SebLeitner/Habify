@@ -5,6 +5,7 @@ import Button from './Button';
 
 const navItems = [
   { to: '/activities', label: 'Aktivitäten' },
+  { to: '/editor', label: 'Editor' },
   { to: '/logs', label: 'Logbuch' },
   { to: '/stats', label: 'Statistiken' },
 ];

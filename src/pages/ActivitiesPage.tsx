@@ -1,16 +1,12 @@
 import { useMemo, useState } from 'react';
-import ActivityForm from '../components/Activity/ActivityForm';
-import ActivityList from '../components/Activity/ActivityList';
-import Button from '../components/UI/Button';
-import Modal from '../components/UI/Modal';
+import ActivityQuickLogList from '../components/Activity/ActivityQuickLogList';
 import Spinner from '../components/UI/Spinner';
-import { Activity, useData } from '../contexts/DataContext';
+import { useData } from '../contexts/DataContext';
 
 const ActivitiesPage = () => {
-  const { state, addActivity, updateActivity, deleteActivity, addLog, isLoading, error } = useData();
-  const [sort, setSort] = useState<'createdAt' | 'name'>('createdAt');
+  const { state, addLog, isLoading, error } = useData();
+  const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Activity | null>(null);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -21,119 +17,61 @@ const ActivitiesPage = () => {
   }, [state.activities]);
 
   const activities = useMemo(() => {
-    const sorted = [...state.activities];
-    if (sort === 'createdAt') {
-      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else {
-      sorted.sort((a, b) => a.name.localeCompare(b.name, 'de')); // alphabetical
-    }
-    if (!categoryFilter) {
-      return sorted;
-    }
-    return sorted.filter((activity) => activity.categories?.includes(categoryFilter));
-  }, [state.activities, sort, categoryFilter]);
-
-  const handleCreate = async (values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => {
-    await addActivity(values);
-  };
-
-  const handleUpdate = async (values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!editing) return;
-    await updateActivity(editing.id, values);
-    setEditing(null);
-  };
-
-  const handleDelete = async (activity: Activity) => {
-    if (window.confirm(`Aktivität "${activity.name}" löschen?`)) {
-      await deleteActivity(activity.id);
-    }
-  };
+    return state.activities
+      .filter((activity) => {
+        const matchesCategory = categoryFilter ? activity.categories?.includes(categoryFilter) : true;
+        const matchesSearch = activity.name.toLowerCase().includes(searchTerm.trim().toLowerCase());
+        return matchesCategory && matchesSearch;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }, [state.activities, categoryFilter, searchTerm]);
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Aktivitäten</h1>
-          <p className="text-sm text-slate-400">
-            Verwalte deine Routinen. Aktivitäten können später im Logbuch ausgewählt werden.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            Sortieren nach
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as 'createdAt' | 'name')}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-            >
-              <option value="createdAt">Erstellungsdatum</option>
-              <option value="name">Name</option>
-            </select>
-          </label>
-          <Modal triggerLabel="Neue Aktivität" title="Aktivität hinzufügen">
-            {(close) => (
-              <ActivityForm
-                onSubmit={async (values) => {
-                  await handleCreate(values);
-                  close();
-                }}
-              />
-            )}
-          </Modal>
-        </div>
-      </header>
-      {!!categories.length && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setCategoryFilter(null)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              categoryFilter === null
-                ? 'bg-brand-primary/20 text-brand-secondary'
-                : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-            }`}
-          >
-            Alle
-          </button>
-          {categories.map((category) => (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <input
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Suchen"
+          className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40 sm:max-w-xs"
+        />
+        {categories.length > 0 && (
+          <div className="flex flex-wrap gap-2">
             <button
-              key={category}
               type="button"
-              onClick={() => setCategoryFilter((current) => (current === category ? null : category))}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                categoryFilter === category
+              onClick={() => setCategoryFilter(null)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                categoryFilter === null
                   ? 'bg-brand-primary/20 text-brand-secondary'
                   : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
               }`}
             >
-              {category}
+              Alle
             </button>
-          ))}
-        </div>
-      )}
+            {categories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setCategoryFilter((current) => (current === category ? null : category))}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  categoryFilter === category
+                    ? 'bg-brand-primary/20 text-brand-secondary'
+                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-8">
           <Spinner label="Lade Aktivitäten" />
         </div>
       ) : (
-        <ActivityList
-          activities={activities}
-          onEdit={setEditing}
-          onDelete={handleDelete}
-          onAddLog={addLog}
-        />
-      )}
-      {editing && (
-        <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Aktivität bearbeiten</h2>
-            <Button variant="ghost" onClick={() => setEditing(null)}>
-              Schließen
-            </Button>
-          </div>
-          <ActivityForm initialActivity={editing} onSubmit={handleUpdate} onCancel={() => setEditing(null)} />
-        </div>
+        <ActivityQuickLogList activities={activities} onAddLog={addLog} dense />
       )}
     </div>
   );

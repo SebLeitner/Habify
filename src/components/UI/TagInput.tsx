@@ -5,15 +5,27 @@ type TagInputProps = {
   value: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
+  suggestions?: string[];
 };
 
-const TagInput = ({ label, value, onChange, placeholder }: TagInputProps) => {
+const TagInput = ({ label, value, onChange, placeholder, suggestions = [] }: TagInputProps) => {
   const [inputValue, setInputValue] = useState('');
 
   const normalizedTags = useMemo(
     () => value.map((tag) => tag.trim()).filter((tag) => tag.length > 0),
     [value],
   );
+
+  const availableSuggestions = useMemo(() => {
+    const lowerSelected = new Set(normalizedTags.map((tag) => tag.toLowerCase()));
+    const filtered = suggestions.filter((suggestion) => !lowerSelected.has(suggestion.toLowerCase()));
+    if (!inputValue.trim()) {
+      return filtered;
+    }
+    return filtered.filter((suggestion) =>
+      suggestion.toLowerCase().includes(inputValue.trim().toLowerCase()),
+    );
+  }, [normalizedTags, suggestions, inputValue]);
 
   const addTag = (rawTag: string) => {
     const tag = rawTag.trim();
@@ -88,6 +100,20 @@ const TagInput = ({ label, value, onChange, placeholder }: TagInputProps) => {
           placeholder={placeholder}
         />
       </div>
+      {!!availableSuggestions.length && (
+        <div className="flex flex-wrap gap-2">
+          {availableSuggestions.slice(0, 8).map((suggestion) => (
+            <button
+              key={suggestion}
+              type="button"
+              className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+              onClick={() => addTag(suggestion)}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
     </label>
   );
 };

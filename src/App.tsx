@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ActivitiesPage from './pages/ActivitiesPage';
+import ActivityEditorPage from './pages/ActivityEditorPage';
 import LogsPage from './pages/LogsPage';
 import StatsPage from './pages/StatsPage';
 import LoginPage from './pages/LoginPage';
@@ -16,6 +17,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <ActivitiesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/editor"
+          element={
+            <ProtectedRoute>
+              <ActivityEditorPage />
             </ProtectedRoute>
           }
         />

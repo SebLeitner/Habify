@@ -1,4 +1,4 @@
-import type { Activity, LogEntry } from '../types';
+import type { Activity, ActivityAttribute, LogAttributeValue, LogEntry } from '../types';
 
 const DEFAULT_API_BASE = 'https://v2thu7qsrd.execute-api.eu-central-1.amazonaws.com/dev';
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE).replace(/\/$/, '');
@@ -56,16 +56,106 @@ const request = async <T>({ path, payload }: RequestOptions): Promise<T> => {
   return (await handleResponse(response)) as T;
 };
 
+const normalizeAttributes = (attributes: unknown): ActivityAttribute[] => {
+  if (!Array.isArray(attributes)) {
+    return [];
+  }
+
+  const normalized: ActivityAttribute[] = [];
+
+  attributes.forEach((attribute) => {
+    if (!attribute || typeof attribute !== 'object') {
+      return;
+    }
+    const { id, name, type, unit } = attribute as Partial<ActivityAttribute>;
+    if (!id || !name || !type) {
+      return;
+    }
+    normalized.push({
+      id,
+      name: name.toString(),
+      type,
+      unit: unit ?? null,
+    });
+  });
+
+  return normalized;
+};
+
 const normalizeActivity = (activity: Activity): Activity => ({
   ...activity,
   categories: Array.isArray(activity.categories)
     ? activity.categories.map((category) => category.toString())
     : [],
+  attributes: normalizeAttributes((activity as Activity).attributes),
 });
+
+const normalizeLogAttributes = (values: unknown): LogAttributeValue[] | undefined => {
+  if (!Array.isArray(values)) {
+    return undefined;
+  }
+
+  return values
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const { attributeId, type } = entry as Partial<LogAttributeValue>;
+      if (!attributeId || !type) {
+        return null;
+      }
+
+      switch (type) {
+        case 'number': {
+          const rawValue = (entry as { value?: number | string | null }).value;
+          const value =
+            rawValue === null || rawValue === undefined || rawValue === ''
+              ? null
+              : Number(rawValue);
+          return {
+            attributeId,
+            type,
+            value: Number.isNaN(value as number) ? null : value,
+          } as LogAttributeValue;
+        }
+        case 'text':
+          return {
+            attributeId,
+            type,
+            value: ((entry as { value?: string }).value ?? '').toString(),
+          } as LogAttributeValue;
+        case 'timeRange': {
+          const { start = null, end = null } = entry as { start?: string | null; end?: string | null };
+          return {
+            attributeId,
+            type,
+            start: start ?? null,
+            end: end ?? null,
+          } as LogAttributeValue;
+        }
+        case 'duration': {
+          const { hours = null, minutes = null } = entry as {
+            hours?: number | null;
+            minutes?: number | null;
+          };
+          return {
+            attributeId,
+            type,
+            hours: hours ?? null,
+            minutes: minutes ?? null,
+          } as LogAttributeValue;
+        }
+        default:
+          return null;
+      }
+    })
+    .filter((value): value is LogAttributeValue => value !== null);
+};
 
 const normalizeLog = (log: LogEntry): LogEntry => ({
   ...log,
   note: log.note ?? undefined,
+  attributes: normalizeLogAttributes((log as LogEntry).attributes),
 });
 
 const extractActivities = (payload: ActivitiesListResponse): Activity[] => {

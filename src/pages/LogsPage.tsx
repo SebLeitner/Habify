@@ -31,11 +31,21 @@ const LogsPage = () => {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [state.logs, filter]);
 
-  const handleCreate = async (values: { activityId: string; timestamp: string; note?: string }) => {
+  const handleCreate = async (values: {
+    activityId: string;
+    timestamp: string;
+    note?: string;
+    attributes?: LogEntry['attributes'];
+  }) => {
     await addLog(values);
   };
 
-  const handleUpdate = async (values: { activityId: string; timestamp: string; note?: string }) => {
+  const handleUpdate = async (values: {
+    activityId: string;
+    timestamp: string;
+    note?: string;
+    attributes?: LogEntry['attributes'];
+  }) => {
     if (!editing) return;
     await updateLog(editing.id, values);
     setEditing(null);
