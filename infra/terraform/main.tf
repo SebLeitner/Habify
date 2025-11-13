@@ -213,6 +213,22 @@ resource "aws_dynamodb_table" "logs" {
   }
 }
 
+resource "aws_dynamodb_table" "highlights" {
+  name         = "${local.project_name}-${var.environment}-highlights"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  tags = {
+    Project     = local.project_name
+    Environment = var.environment
+  }
+}
+
 resource "aws_iam_role" "lambda" {
   name = "${local.project_name}-${var.environment}-lambda-role"
 
@@ -251,7 +267,12 @@ resource "aws_iam_role_policy" "lambda_dynamo" {
           "dynamodb:Scan"
         ]
         Effect   = "Allow"
-        Resource = [aws_dynamodb_table.activities.arn, aws_dynamodb_table.logs.arn, "${aws_dynamodb_table.logs.arn}/index/activityId-index"]
+        Resource = [
+          aws_dynamodb_table.activities.arn,
+          aws_dynamodb_table.logs.arn,
+          "${aws_dynamodb_table.logs.arn}/index/activityId-index",
+          aws_dynamodb_table.highlights.arn,
+        ]
       }
     ]
   })
@@ -270,6 +291,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       ACTIVITIES_TABLE = aws_dynamodb_table.activities.name
       LOGS_TABLE       = aws_dynamodb_table.logs.name
+      HIGHLIGHTS_TABLE = aws_dynamodb_table.highlights.name
     }
   }
 }
@@ -339,6 +361,10 @@ locals {
     "/logs/list",
     "/logs/update",
     "/logs/delete",
+    "/highlights/add",
+    "/highlights/list",
+    "/highlights/update",
+    "/highlights/delete",
     "/stats/today",
     "/stats/week",
     "/stats/month"

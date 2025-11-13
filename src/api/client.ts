@@ -1,4 +1,4 @@
-import type { Activity, ActivityAttribute, LogAttributeValue, LogEntry } from '../types';
+import type { Activity, ActivityAttribute, DailyHighlight, LogAttributeValue, LogEntry } from '../types';
 
 const DEFAULT_API_BASE = 'https://v2thu7qsrd.execute-api.eu-central-1.amazonaws.com/dev';
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE).replace(/\/$/, '');
@@ -12,14 +12,19 @@ type ActivitiesListResponse = { items: Activity[] } | Activity[];
 type ActivityResponse = { item: Activity } | Activity;
 type LogsListResponse = { items: LogEntry[] } | LogEntry[];
 type LogResponse = { item: LogEntry } | LogEntry;
+type HighlightsListResponse = { items: DailyHighlight[] } | DailyHighlight[];
+type HighlightResponse = { item: DailyHighlight } | DailyHighlight;
 
 type ListLogsParams = { userId?: string };
+type ListHighlightsParams = { userId?: string; date?: string };
 
 type UpdateActivityPayload = Partial<Omit<Activity, 'createdAt' | 'updatedAt'>> & { id: string };
 
 type UpdateLogPayload = Partial<LogEntry> & { id: string; userId: string };
 
 type CreateLogPayload = Omit<LogEntry, 'id'> & { id?: string };
+type UpdateHighlightPayload = Partial<DailyHighlight> & { id: string; userId: string };
+type CreateHighlightPayload = Omit<DailyHighlight, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -158,6 +163,12 @@ const normalizeLog = (log: LogEntry): LogEntry => ({
   attributes: normalizeLogAttributes((log as LogEntry).attributes),
 });
 
+const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
+  ...highlight,
+  date: highlight.date,
+  text: (highlight.text ?? '').toString(),
+});
+
 const extractActivities = (payload: ActivitiesListResponse): Activity[] => {
   if (Array.isArray(payload)) {
     return payload.map(normalizeActivity);
@@ -198,6 +209,26 @@ const extractLog = (payload: LogResponse): LogEntry => {
   return normalizeLog(payload as LogEntry);
 };
 
+const extractHighlights = (payload: HighlightsListResponse): DailyHighlight[] => {
+  if (Array.isArray(payload)) {
+    return payload.map(normalizeHighlight);
+  }
+
+  if ('items' in payload && Array.isArray(payload.items)) {
+    return payload.items.map(normalizeHighlight);
+  }
+
+  return [];
+};
+
+const extractHighlight = (payload: HighlightResponse): DailyHighlight => {
+  if ('item' in payload && payload.item) {
+    return normalizeHighlight(payload.item);
+  }
+
+  return normalizeHighlight(payload as DailyHighlight);
+};
+
 export const listActivities = async (): Promise<Activity[]> => {
   const response = await request<ActivitiesListResponse>({ path: '/activities/list' });
   return extractActivities(response);
@@ -236,4 +267,26 @@ export const updateLog = async (payload: UpdateLogPayload): Promise<LogEntry> =>
 
 export const deleteLog = async (id: string, timestamp: string): Promise<void> => {
   await request({ path: '/logs/delete', payload: { id, timestamp } });
+};
+
+export const listHighlights = async ({ userId, date }: ListHighlightsParams = {}): Promise<DailyHighlight[]> => {
+  const response = await request<HighlightsListResponse>({
+    path: '/highlights/list',
+    payload: { userId, date },
+  });
+  return extractHighlights(response);
+};
+
+export const createHighlight = async (payload: CreateHighlightPayload): Promise<DailyHighlight> => {
+  const response = await request<HighlightResponse>({ path: '/highlights/add', payload });
+  return extractHighlight(response);
+};
+
+export const updateHighlight = async (payload: UpdateHighlightPayload): Promise<DailyHighlight> => {
+  const response = await request<HighlightResponse>({ path: '/highlights/update', payload });
+  return extractHighlight(response);
+};
+
+export const deleteHighlight = async (id: string): Promise<void> => {
+  await request({ path: '/highlights/delete', payload: { id } });
 };
