@@ -11,6 +11,7 @@ const {
 
 const ACTIVITIES_TABLE = process.env.ACTIVITIES_TABLE;
 const LOGS_TABLE = process.env.LOGS_TABLE;
+const HIGHLIGHTS_TABLE = process.env.HIGHLIGHTS_TABLE;
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -92,6 +93,28 @@ const sanitizeLog = (item) => ({
   note: item.note ?? undefined,
   userId: item.userId,
 });
+
+const sanitizeHighlight = (item) => ({
+  id: item.id,
+  date: item.date,
+  text: item.text ?? '',
+  userId: item.userId,
+  createdAt: item.createdAt ?? new Date().toISOString(),
+  updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
+});
+
+const normalizeHighlightDate = (raw) => {
+  if (!raw) {
+    throw new HttpError(400, 'Datum ist erforderlich.');
+  }
+
+  const date = new Date(raw.toString());
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpError(400, 'Ungültiges Datum.');
+  }
+
+  return date.toISOString().slice(0, 10);
+};
 
 const listActivities = async () => {
   const result = await dynamoClient.send(
@@ -428,6 +451,180 @@ const deleteLog = async (payload) => {
   return respond(200, { success: true });
 };
 
+const listHighlights = async (payload) => {
+  if (!HIGHLIGHTS_TABLE) {
+    throw new HttpError(500, 'Highlights-Tabelle ist nicht konfiguriert.');
+  }
+
+  const userId = payload?.userId?.toString();
+  const dateFilter = payload?.date ? normalizeHighlightDate(payload.date) : null;
+
+  const result = await dynamoClient.send(
+    new ScanCommand({
+      TableName: HIGHLIGHTS_TABLE,
+    }),
+  );
+
+  let items = result.Items ?? [];
+  if (userId) {
+    items = items.filter((item) => item.userId === userId);
+  }
+
+  if (dateFilter) {
+    items = items.filter((item) => item.date === dateFilter);
+  }
+
+  const sanitized = items.map(sanitizeHighlight);
+  sanitized.sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+
+  return respond(200, { items: sanitized });
+};
+
+const addHighlight = async (payload) => {
+  if (!HIGHLIGHTS_TABLE) {
+    throw new HttpError(500, 'Highlights-Tabelle ist nicht konfiguriert.');
+  }
+
+  const userId = payload?.userId?.toString();
+  const text = (payload?.text ?? '').toString().trim();
+
+  if (!userId) {
+    throw new HttpError(400, 'Benutzer ist erforderlich.');
+  }
+
+  if (!text) {
+    throw new HttpError(400, 'Highlight-Text ist erforderlich.');
+  }
+
+  const date = normalizeHighlightDate(payload?.date);
+  const now = new Date().toISOString();
+
+  const item = {
+    id: payload?.id?.toString() ?? crypto.randomUUID(),
+    userId,
+    date,
+    text,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await dynamoClient.send(
+    new PutCommand({
+      TableName: HIGHLIGHTS_TABLE,
+      Item: item,
+    }),
+  );
+
+  return respond(201, { item: sanitizeHighlight(item) });
+};
+
+const findHighlightById = async (id) => {
+  if (!HIGHLIGHTS_TABLE) {
+    throw new HttpError(500, 'Highlights-Tabelle ist nicht konfiguriert.');
+  }
+
+  const result = await dynamoClient.send(
+    new QueryCommand({
+      TableName: HIGHLIGHTS_TABLE,
+      KeyConditionExpression: '#id = :id',
+      ExpressionAttributeNames: { '#id': 'id' },
+      ExpressionAttributeValues: { ':id': id },
+      Limit: 1,
+    }),
+  );
+
+  return result.Items?.[0];
+};
+
+const updateHighlight = async (payload) => {
+  if (!HIGHLIGHTS_TABLE) {
+    throw new HttpError(500, 'Highlights-Tabelle ist nicht konfiguriert.');
+  }
+
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Highlight-ID fehlt.');
+  }
+
+  const existing = await findHighlightById(id);
+  if (!existing) {
+    throw new HttpError(404, 'Highlight wurde nicht gefunden.');
+  }
+
+  const expression = ['#updatedAt = :updatedAt'];
+  const attributeNames = { '#updatedAt': 'updatedAt' };
+  const attributeValues = { ':updatedAt': new Date().toISOString() };
+
+  if (payload?.text !== undefined) {
+    const nextText = payload.text?.toString().trim();
+    if (!nextText) {
+      throw new HttpError(400, 'Highlight-Text darf nicht leer sein.');
+    }
+    expression.push('#text = :text');
+    attributeNames['#text'] = 'text';
+    attributeValues[':text'] = nextText;
+  }
+
+  if (payload?.date !== undefined) {
+    const nextDate = normalizeHighlightDate(payload.date);
+    expression.push('#date = :date');
+    attributeNames['#date'] = 'date';
+    attributeValues[':date'] = nextDate;
+  }
+
+  if (payload?.userId !== undefined) {
+    const nextUserId = payload.userId.toString();
+    if (nextUserId !== existing.userId) {
+      expression.push('#userId = :userId');
+      attributeNames['#userId'] = 'userId';
+      attributeValues[':userId'] = nextUserId;
+    }
+  }
+
+  if (expression.length === 1) {
+    return respond(200, { item: sanitizeHighlight({ ...existing, updatedAt: attributeValues[':updatedAt'] }) });
+  }
+
+  const result = await dynamoClient.send(
+    new UpdateCommand({
+      TableName: HIGHLIGHTS_TABLE,
+      Key: { id },
+      UpdateExpression: `SET ${expression.join(', ')}`,
+      ExpressionAttributeNames: attributeNames,
+      ExpressionAttributeValues: attributeValues,
+      ReturnValues: 'ALL_NEW',
+    }),
+  );
+
+  if (!result.Attributes) {
+    throw new HttpError(500, 'Highlight konnte nicht aktualisiert werden.');
+  }
+
+  return respond(200, { item: sanitizeHighlight(result.Attributes) });
+};
+
+const deleteHighlight = async (payload) => {
+  if (!HIGHLIGHTS_TABLE) {
+    throw new HttpError(500, 'Highlights-Tabelle ist nicht konfiguriert.');
+  }
+
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Highlight-ID fehlt.');
+  }
+
+  await dynamoClient.send(
+    new DeleteCommand({
+      TableName: HIGHLIGHTS_TABLE,
+      Key: { id },
+    }),
+  );
+
+  return respond(200, { success: true });
+};
+
 const routeHandlers = {
   '/activities/list': listActivities,
   '/activities/add': addActivity,
@@ -437,6 +634,10 @@ const routeHandlers = {
   '/logs/add': addLog,
   '/logs/update': updateLog,
   '/logs/delete': deleteLog,
+  '/highlights/list': listHighlights,
+  '/highlights/add': addHighlight,
+  '/highlights/update': updateHighlight,
+  '/highlights/delete': deleteHighlight,
 };
 
 exports.handler = async (event) => {

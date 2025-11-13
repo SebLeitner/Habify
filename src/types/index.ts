@@ -51,3 +51,12 @@ export type LogEntry = {
   attributes?: LogAttributeValue[];
   userId: string;
 };
+
+export type DailyHighlight = {
+  id: string;
+  date: string;
+  text: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+};

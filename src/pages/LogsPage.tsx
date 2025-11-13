@@ -5,10 +5,12 @@ import LogForm from '../components/Log/LogForm';
 import LogList from '../components/Log/LogList';
 import Button from '../components/UI/Button';
 import Spinner from '../components/UI/Spinner';
-import { LogEntry, useData } from '../contexts/DataContext';
+import DailyHighlights from '../components/Log/DailyHighlights';
+import { type DailyHighlight, LogEntry, useData } from '../contexts/DataContext';
 
 const LogsPage = () => {
-  const { state, addLog, updateLog, deleteLog, isLoading, error } = useData();
+  const { state, addLog, updateLog, deleteLog, addHighlight, deleteHighlight, isLoading, error } =
+    useData();
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
   const [editing, setEditing] = useState<LogEntry | null>(null);
 
@@ -42,6 +44,12 @@ const LogsPage = () => {
 
   const formattedDateLabel = format(selectedDate, 'EEEE, dd. MMMM yyyy', { locale: de });
   const datePickerValue = format(selectedDate, 'yyyy-MM-dd');
+  const highlightDateKey = format(selectedDate, 'yyyy-MM-dd');
+  const highlightsForSelectedDate = useMemo(() => {
+    return state.highlights
+      .filter((highlight) => highlight.date === highlightDateKey)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [state.highlights, highlightDateKey]);
   const today = startOfDay(new Date());
   const disableNextDay = isSameDay(selectedDate, today) || isAfter(selectedDate, today);
 
@@ -77,6 +85,14 @@ const LogsPage = () => {
     if (window.confirm('Log-Eintrag wirklich löschen?')) {
       await deleteLog(log.id);
     }
+  };
+
+  const handleAddHighlight = async (text: string) => {
+    await addHighlight({ date: highlightDateKey, text });
+  };
+
+  const handleDeleteHighlight = async (highlight: DailyHighlight) => {
+    await deleteHighlight(highlight.id);
   };
 
   return (
@@ -127,6 +143,11 @@ const LogsPage = () => {
         <h2 className="mb-4 text-lg font-semibold text-white">Neuen Log-Eintrag speichern</h2>
         <LogForm activities={state.activities} onSubmit={handleCreate} />
       </div>
+      <DailyHighlights
+        highlights={highlightsForSelectedDate}
+        onAdd={handleAddHighlight}
+        onDelete={handleDeleteHighlight}
+      />
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Spinner label="Lade Logbuch" />

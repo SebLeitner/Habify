@@ -17,15 +17,20 @@ import {
   updateActivity as updateActivityRequest,
   updateLog as updateLogRequest,
   createLog,
+  listHighlights,
+  createHighlight,
+  updateHighlight as updateHighlightRequest,
+  deleteHighlight as deleteHighlightRequest,
 } from '../api/client';
-import type { Activity, LogEntry } from '../types';
+import type { Activity, DailyHighlight, LogEntry } from '../types';
 import { useAuth } from './AuthContext';
 
-export type { Activity, LogEntry } from '../types';
+export type { Activity, LogEntry, DailyHighlight } from '../types';
 
 type DataState = {
   activities: Activity[];
   logs: LogEntry[];
+  highlights: DailyHighlight[];
 };
 
 type Action =
@@ -36,11 +41,16 @@ type Action =
   | { type: 'SET_LOGS'; payload: LogEntry[] }
   | { type: 'ADD_LOG'; payload: LogEntry }
   | { type: 'UPDATE_LOG'; payload: LogEntry }
-  | { type: 'REMOVE_LOG'; payload: string };
+  | { type: 'REMOVE_LOG'; payload: string }
+  | { type: 'SET_HIGHLIGHTS'; payload: DailyHighlight[] }
+  | { type: 'ADD_HIGHLIGHT'; payload: DailyHighlight }
+  | { type: 'UPDATE_HIGHLIGHT'; payload: DailyHighlight }
+  | { type: 'REMOVE_HIGHLIGHT'; payload: string };
 
 const initialState: DataState = {
   activities: [],
   logs: [],
+  highlights: [],
 };
 
 const DataContext = createContext<{
@@ -53,6 +63,9 @@ const DataContext = createContext<{
   addLog: (input: Omit<LogEntry, 'id' | 'userId'>) => Promise<void>;
   updateLog: (id: string, updates: Partial<LogEntry>) => Promise<void>;
   deleteLog: (id: string) => Promise<void>;
+  addHighlight: (input: Omit<DailyHighlight, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateHighlight: (id: string, updates: Partial<DailyHighlight>) => Promise<void>;
+  deleteHighlight: (id: string) => Promise<void>;
   refresh: () => void;
 } | null>(null);
 
@@ -82,6 +95,19 @@ const reducer = (state: DataState, action: Action): DataState => {
       };
     case 'REMOVE_LOG':
       return { ...state, logs: state.logs.filter((log) => log.id !== action.payload) };
+    case 'SET_HIGHLIGHTS':
+      return { ...state, highlights: action.payload };
+    case 'ADD_HIGHLIGHT':
+      return { ...state, highlights: [...state.highlights, action.payload] };
+    case 'UPDATE_HIGHLIGHT':
+      return {
+        ...state,
+        highlights: state.highlights.map((highlight) =>
+          highlight.id === action.payload.id ? action.payload : highlight,
+        ),
+      };
+    case 'REMOVE_HIGHLIGHT':
+      return { ...state, highlights: state.highlights.filter((highlight) => highlight.id !== action.payload) };
     default:
       return state;
   }
@@ -104,12 +130,14 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoading(true);
     try {
-      const [activityResponse, logResponse] = await Promise.all([
+      const [activityResponse, logResponse, highlightsResponse] = await Promise.all([
         listActivities(),
         listLogs({ userId: user.id }),
+        listHighlights({ userId: user.id }),
       ]);
       dispatch({ type: 'SET_ACTIVITIES', payload: activityResponse });
       dispatch({ type: 'SET_LOGS', payload: logResponse });
+      dispatch({ type: 'SET_HIGHLIGHTS', payload: highlightsResponse });
       setError(null);
     } catch (apiError) {
       console.error('Fehler beim Laden der Daten', apiError);
@@ -217,6 +245,44 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     loadData();
   }, [loadData]);
 
+  const addHighlight = useCallback(
+    async (input: Omit<DailyHighlight, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+      if (!user) throw new Error('Nicht angemeldet');
+      try {
+        const created = await createHighlight({ ...input, userId: user.id });
+        dispatch({ type: 'ADD_HIGHLIGHT', payload: created });
+      } catch (apiError) {
+        console.error('Highlight konnte nicht erstellt werden', apiError);
+        throw apiError;
+      }
+    },
+    [user],
+  );
+
+  const updateHighlight = useCallback(
+    async (id: string, updates: Partial<DailyHighlight>) => {
+      if (!user) throw new Error('Nicht angemeldet');
+      try {
+        const updated = await updateHighlightRequest({ id, ...updates, userId: user.id });
+        dispatch({ type: 'UPDATE_HIGHLIGHT', payload: updated });
+      } catch (apiError) {
+        console.error('Highlight konnte nicht aktualisiert werden', apiError);
+        throw apiError;
+      }
+    },
+    [user],
+  );
+
+  const deleteHighlight = useCallback(async (id: string) => {
+    try {
+      await deleteHighlightRequest(id);
+      dispatch({ type: 'REMOVE_HIGHLIGHT', payload: id });
+    } catch (apiError) {
+      console.error('Highlight konnte nicht gelöscht werden', apiError);
+      throw apiError;
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       state,
@@ -228,9 +294,26 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addLog,
       updateLog,
       deleteLog,
+      addHighlight,
+      updateHighlight,
+      deleteHighlight,
       refresh,
     }),
-    [state, isLoading, error, addActivity, updateActivity, deleteActivity, addLog, updateLog, deleteLog, refresh],
+    [
+      state,
+      isLoading,
+      error,
+      addActivity,
+      updateActivity,
+      deleteActivity,
+      addLog,
+      updateLog,
+      deleteLog,
+      addHighlight,
+      updateHighlight,
+      deleteHighlight,
+      refresh,
+    ],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
