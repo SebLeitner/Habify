@@ -122,7 +122,7 @@ resource "aws_cloudfront_distribution" "frontend" {
 
   depends_on = [aws_acm_certificate_validation.app]
 
-  origins {
+  origin {
     domain_name = aws_s3_bucket.frontend.bucket_regional_domain_name
     origin_id   = "s3-frontend"
 
