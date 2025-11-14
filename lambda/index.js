@@ -562,6 +562,36 @@ const deleteLog = async (payload) => {
   return respond(200, { success: true });
 };
 
+const buildHighlightScanInput = ({ userId, dateFilter }) => {
+  const params = {
+    TableName: HIGHLIGHTS_TABLE,
+  };
+
+  const filterExpressions = [];
+  const attributeNames = {};
+  const attributeValues = {};
+
+  if (userId) {
+    filterExpressions.push('#userId = :userId');
+    attributeNames['#userId'] = 'userId';
+    attributeValues[':userId'] = userId;
+  }
+
+  if (dateFilter) {
+    filterExpressions.push('#date = :date');
+    attributeNames['#date'] = 'date';
+    attributeValues[':date'] = dateFilter;
+  }
+
+  if (filterExpressions.length > 0) {
+    params.FilterExpression = filterExpressions.join(' AND ');
+    params.ExpressionAttributeNames = attributeNames;
+    params.ExpressionAttributeValues = attributeValues;
+  }
+
+  return params;
+};
+
 const listHighlights = async (payload) => {
   if (!HIGHLIGHTS_TABLE) {
     throw new HttpError(500, 'Highlights-Tabelle ist nicht konfiguriert.');
@@ -570,20 +600,11 @@ const listHighlights = async (payload) => {
   const userId = payload?.userId?.toString();
   const dateFilter = payload?.date ? normalizeHighlightDate(payload.date) : null;
 
-  const result = await dynamoClient.send(
-    new ScanCommand({
-      TableName: HIGHLIGHTS_TABLE,
-    }),
-  );
+  const commandInput = buildHighlightScanInput({ userId, dateFilter });
 
-  let items = result.Items ?? [];
-  if (userId) {
-    items = items.filter((item) => item.userId === userId);
-  }
+  const result = await dynamoClient.send(new ScanCommand(commandInput));
 
-  if (dateFilter) {
-    items = items.filter((item) => item.date === dateFilter);
-  }
+  const items = result.Items ?? [];
 
   const sanitized = items.map(sanitizeHighlight);
   sanitized.sort(
@@ -621,12 +642,20 @@ const addHighlight = async (payload) => {
     updatedAt: now,
   };
 
-  await dynamoClient.send(
-    new PutCommand({
-      TableName: HIGHLIGHTS_TABLE,
-      Item: item,
-    }),
-  );
+  try {
+    await dynamoClient.send(
+      new PutCommand({
+        TableName: HIGHLIGHTS_TABLE,
+        Item: item,
+        ConditionExpression: 'attribute_not_exists(id)',
+      }),
+    );
+  } catch (error) {
+    if (error?.name === 'ConditionalCheckFailedException') {
+      throw new HttpError(409, 'Highlight existiert bereits.');
+    }
+    throw error;
+  }
 
   return respond(201, { item: sanitizeHighlight(item) });
 };

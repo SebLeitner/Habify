@@ -7,10 +7,12 @@ const DailyHighlights = ({
   highlights,
   onAdd,
   onDelete,
+  error,
 }: {
   highlights: DailyHighlight[];
   onAdd: (text: string) => Promise<void> | void;
   onDelete: (highlight: DailyHighlight) => Promise<void> | void;
+  error?: string | null;
 }) => {
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,6 +28,8 @@ const DailyHighlights = ({
     try {
       await onAdd(value);
       setText('');
+    } catch (submitError) {
+      console.error('Highlight konnte nicht gespeichert werden', submitError);
     } finally {
       setIsSubmitting(false);
     }
@@ -35,6 +39,8 @@ const DailyHighlights = ({
     setPendingDeleteId(highlight.id);
     try {
       await onDelete(highlight);
+    } catch (deleteError) {
+      console.error('Highlight konnte nicht gelöscht werden', deleteError);
     } finally {
       setPendingDeleteId(null);
     }
@@ -43,6 +49,7 @@ const DailyHighlights = ({
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
       <h2 className="mb-4 text-lg font-semibold text-white">Highlights des Tages</h2>
+      {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
       <form className="space-y-3" onSubmit={handleSubmit}>
         <TextArea
           label="Neues Highlight"
