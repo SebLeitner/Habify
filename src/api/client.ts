@@ -166,6 +166,7 @@ const normalizeLog = (log: LogEntry): LogEntry => ({
 const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
   ...highlight,
   date: highlight.date,
+  title: (highlight.title ?? '').toString(),
   text: (highlight.text ?? '').toString(),
 });
 

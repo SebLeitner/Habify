@@ -201,6 +201,7 @@ const sanitizeLog = (item) => ({
 const sanitizeHighlight = (item) => ({
   id: item.id,
   date: item.date,
+  title: item.title ?? '',
   text: item.text ?? '',
   userId: item.userId,
   createdAt: item.createdAt ?? new Date().toISOString(),
@@ -620,10 +621,15 @@ const addHighlight = async (payload) => {
   }
 
   const userId = payload?.userId?.toString();
+  const title = (payload?.title ?? '').toString().trim();
   const text = (payload?.text ?? '').toString().trim();
 
   if (!userId) {
     throw new HttpError(400, 'Benutzer ist erforderlich.');
+  }
+
+  if (!title) {
+    throw new HttpError(400, 'Highlight-Titel ist erforderlich.');
   }
 
   if (!text) {
@@ -637,6 +643,7 @@ const addHighlight = async (payload) => {
     id: payload?.id?.toString() ?? crypto.randomUUID(),
     userId,
     date,
+    title,
     text,
     createdAt: now,
     updatedAt: now,
@@ -705,6 +712,16 @@ const updateHighlight = async (payload) => {
     expression.push('#text = :text');
     attributeNames['#text'] = 'text';
     attributeValues[':text'] = nextText;
+  }
+
+  if (payload?.title !== undefined) {
+    const nextTitle = payload.title?.toString().trim();
+    if (!nextTitle) {
+      throw new HttpError(400, 'Highlight-Titel darf nicht leer sein.');
+    }
+    expression.push('#title = :title');
+    attributeNames['#title'] = 'title';
+    attributeValues[':title'] = nextTitle;
   }
 
   if (payload?.date !== undefined) {

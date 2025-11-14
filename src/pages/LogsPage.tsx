@@ -1,7 +1,6 @@
 import { ChangeEvent, useMemo, useState } from 'react';
 import { addDays, endOfDay, format, isAfter, isSameDay, startOfDay } from 'date-fns';
 import { de } from 'date-fns/locale';
-import LogForm from '../components/Log/LogForm';
 import LogList from '../components/Log/LogList';
 import Button from '../components/UI/Button';
 import Spinner from '../components/UI/Spinner';
@@ -9,10 +8,8 @@ import DailyHighlights from '../components/Log/DailyHighlights';
 import { type DailyHighlight, LogEntry, useData } from '../contexts/DataContext';
 
 const LogsPage = () => {
-  const { state, addLog, updateLog, deleteLog, addHighlight, deleteHighlight, isLoading, error } =
-    useData();
+  const { state, deleteLog, deleteHighlight, isLoading, error } = useData();
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
-  const [editing, setEditing] = useState<LogEntry | null>(null);
   const [highlightError, setHighlightError] = useState<string | null>(null);
 
   const filteredLogs = useMemo(() => {
@@ -54,48 +51,9 @@ const LogsPage = () => {
   const today = startOfDay(new Date());
   const disableNextDay = isSameDay(selectedDate, today) || isAfter(selectedDate, today);
 
-  const handleCreate = async (values: {
-    activityId: string;
-    timestamp: string;
-    note?: string;
-    attributes?: LogEntry['attributes'];
-  }) => {
-    await addLog(values);
-    const newDate = startOfDay(new Date(values.timestamp));
-    if (!Number.isNaN(newDate.getTime())) {
-      setSelectedDate(newDate);
-    }
-  };
-
-  const handleUpdate = async (values: {
-    activityId: string;
-    timestamp: string;
-    note?: string;
-    attributes?: LogEntry['attributes'];
-  }) => {
-    if (!editing) return;
-    await updateLog(editing.id, values);
-    const updatedDate = startOfDay(new Date(values.timestamp));
-    if (!Number.isNaN(updatedDate.getTime())) {
-      setSelectedDate(updatedDate);
-    }
-    setEditing(null);
-  };
-
   const handleDelete = async (log: LogEntry) => {
     if (window.confirm('Log-Eintrag wirklich löschen?')) {
       await deleteLog(log.id);
-    }
-  };
-
-  const handleAddHighlight = async (text: string) => {
-    setHighlightError(null);
-    try {
-      await addHighlight({ date: highlightDateKey, text });
-    } catch (apiError) {
-      const message =
-        apiError instanceof Error ? apiError.message : 'Highlight konnte nicht gespeichert werden.';
-      setHighlightError(message);
     }
   };
 
@@ -154,13 +112,8 @@ const LogsPage = () => {
         </div>
       </header>
       {error && <p className="text-sm text-red-400">{error}</p>}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-white">Neuen Log-Eintrag speichern</h2>
-        <LogForm activities={state.activities} onSubmit={handleCreate} />
-      </div>
       <DailyHighlights
         highlights={highlightsForSelectedDate}
-        onAdd={handleAddHighlight}
         onDelete={handleDeleteHighlight}
         error={highlightError}
       />
@@ -169,23 +122,7 @@ const LogsPage = () => {
           <Spinner label="Lade Logbuch" />
         </div>
       ) : (
-        <LogList logs={filteredLogs} activities={state.activities} onEdit={setEditing} onDelete={handleDelete} />
-      )}
-      {editing && (
-        <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Log-Eintrag bearbeiten</h2>
-            <Button variant="ghost" onClick={() => setEditing(null)}>
-              Schließen
-            </Button>
-          </div>
-          <LogForm
-            activities={state.activities}
-            initialLog={editing}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditing(null)}
-          />
-        </div>
+        <LogList logs={filteredLogs} activities={state.activities} onDelete={handleDelete} />
       )}
     </div>
   );

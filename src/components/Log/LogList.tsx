@@ -71,8 +71,8 @@ const LogList = ({
 }: {
   logs: LogEntry[];
   activities: Activity[];
-  onEdit: (log: LogEntry) => void;
-  onDelete: (log: LogEntry) => void;
+  onEdit?: (log: LogEntry) => void;
+  onDelete?: (log: LogEntry) => void;
 }) => {
   if (!logs.length) {
     return <p className="text-sm text-slate-400">Noch keine Einträge an diesem Tag.</p>;
@@ -121,14 +121,20 @@ const LogList = ({
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" onClick={() => onEdit(log)}>
-                Bearbeiten
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => onDelete(log)}>
-                Löschen
-              </Button>
-            </div>
+            {(onEdit || onDelete) && (
+              <div className="flex gap-2">
+                {onEdit && (
+                  <Button type="button" variant="ghost" onClick={() => onEdit(log)}>
+                    Bearbeiten
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button type="button" variant="ghost" onClick={() => onDelete(log)}>
+                    Löschen
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
