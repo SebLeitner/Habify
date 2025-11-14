@@ -13,6 +13,7 @@ const LogsPage = () => {
     useData();
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
   const [editing, setEditing] = useState<LogEntry | null>(null);
+  const [highlightError, setHighlightError] = useState<string | null>(null);
 
   const filteredLogs = useMemo(() => {
     const start = startOfDay(selectedDate);
@@ -88,11 +89,25 @@ const LogsPage = () => {
   };
 
   const handleAddHighlight = async (text: string) => {
-    await addHighlight({ date: highlightDateKey, text });
+    setHighlightError(null);
+    try {
+      await addHighlight({ date: highlightDateKey, text });
+    } catch (apiError) {
+      const message =
+        apiError instanceof Error ? apiError.message : 'Highlight konnte nicht gespeichert werden.';
+      setHighlightError(message);
+    }
   };
 
   const handleDeleteHighlight = async (highlight: DailyHighlight) => {
-    await deleteHighlight(highlight.id);
+    setHighlightError(null);
+    try {
+      await deleteHighlight(highlight.id);
+    } catch (apiError) {
+      const message =
+        apiError instanceof Error ? apiError.message : 'Highlight konnte nicht gelöscht werden.';
+      setHighlightError(message);
+    }
   };
 
   return (
@@ -147,6 +162,7 @@ const LogsPage = () => {
         highlights={highlightsForSelectedDate}
         onAdd={handleAddHighlight}
         onDelete={handleDeleteHighlight}
+        error={highlightError}
       />
       {isLoading ? (
         <div className="flex justify-center py-12">
