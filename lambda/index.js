@@ -73,6 +73,109 @@ const ensureCategories = (input) => {
   return Array.from(new Set(normalized));
 };
 
+const allowedAttributeTypes = new Set(['number', 'text', 'timeRange', 'duration']);
+
+const ensureAttributes = (input) => {
+  if (!input) {
+    return [];
+  }
+
+  if (!Array.isArray(input)) {
+    throw new HttpError(400, 'Attribute müssen als Array übermittelt werden.');
+  }
+
+  const seen = new Set();
+  const normalized = [];
+
+  input.forEach((attribute, index) => {
+    if (!attribute || typeof attribute !== 'object') {
+      throw new HttpError(400, `Ungültiges Attribut an Position ${index + 1}.`);
+    }
+
+    const id = attribute.id?.toString();
+    const name = (attribute.name ?? '').toString().trim();
+    const type = attribute.type?.toString();
+
+    if (!id) {
+      throw new HttpError(400, 'Attribut-ID fehlt.');
+    }
+
+    if (!name) {
+      throw new HttpError(400, `Name für Attribut ${id} ist erforderlich.`);
+    }
+
+    if (!type || !allowedAttributeTypes.has(type)) {
+      throw new HttpError(400, `Ungültiger Typ für Attribut ${name || id}.`);
+    }
+
+    if (seen.has(id)) {
+      return;
+    }
+
+    const unitValue =
+      type === 'number'
+        ? (() => {
+            if (attribute.unit === undefined || attribute.unit === null) {
+              return null;
+            }
+            const trimmed = attribute.unit.toString().trim();
+            return trimmed.length ? trimmed : null;
+          })()
+        : null;
+
+    normalized.push({
+      id,
+      name,
+      type,
+      unit: unitValue,
+    });
+
+    seen.add(id);
+  });
+
+  return normalized;
+};
+
+const sanitizeActivityAttributes = (input) => {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input
+    .map((attribute) => {
+      if (!attribute || typeof attribute !== 'object') {
+        return null;
+      }
+
+      const id = attribute.id?.toString();
+      const name = (attribute.name ?? '').toString();
+      const type = attribute.type?.toString();
+
+      if (!id || !name || !allowedAttributeTypes.has(type)) {
+        return null;
+      }
+
+      const unitValue =
+        type === 'number'
+          ? (() => {
+              if (attribute.unit === undefined || attribute.unit === null) {
+                return null;
+              }
+              const trimmed = attribute.unit.toString().trim();
+              return trimmed.length ? trimmed : null;
+            })()
+          : null;
+
+      return {
+        id,
+        name,
+        type,
+        unit: unitValue,
+      };
+    })
+    .filter(Boolean);
+};
+
 const sanitizeActivity = (item) => ({
   id: item.id,
   name: item.name,
@@ -82,6 +185,7 @@ const sanitizeActivity = (item) => ({
   categories: Array.isArray(item.categories)
     ? item.categories.map((category) => category.toString())
     : [],
+  attributes: sanitizeActivityAttributes(item.attributes),
   createdAt: item.createdAt ?? new Date().toISOString(),
   updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
 });
@@ -149,6 +253,7 @@ const addActivity = async (payload) => {
         ? false
         : true,
     categories: ensureCategories(payload?.categories),
+    attributes: ensureAttributes(payload?.attributes),
     createdAt: now,
     updatedAt: now,
   };
@@ -206,6 +311,12 @@ const updateActivity = async (payload) => {
     expression.push('#categories = :categories');
     attributeNames['#categories'] = 'categories';
     attributeValues[':categories'] = ensureCategories(payload.categories);
+  }
+
+  if (payload?.attributes !== undefined) {
+    expression.push('#attributes = :attributes');
+    attributeNames['#attributes'] = 'attributes';
+    attributeValues[':attributes'] = ensureAttributes(payload.attributes);
   }
 
   expression.push('#updatedAt = :updatedAt');
