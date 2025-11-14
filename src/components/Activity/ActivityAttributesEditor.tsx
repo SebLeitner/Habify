@@ -58,17 +58,17 @@ const ActivityAttributesEditor = ({ attributes, onChange }: ActivityAttributesEd
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-100">Attribute</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Attribute</h3>
         <Button type="button" variant="ghost" onClick={addAttribute}>
           Attribut hinzufügen
         </Button>
       </div>
       {!sortedAttributes.length && (
-        <p className="text-xs text-slate-400">Noch keine Attribute. Füge individuelle Felder für deine Aktivität hinzu.</p>
+        <p className="text-xs text-slate-500">Noch keine Attribute. Füge individuelle Felder für deine Aktivität hinzu.</p>
       )}
       <div className="space-y-4">
         {sortedAttributes.map((attribute) => (
-          <div key={attribute.id} className="space-y-3 rounded-lg border border-slate-800 bg-slate-900/70 p-4">
+          <div key={attribute.id} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
               <div className="md:flex-1">
                 <Input
@@ -78,10 +78,10 @@ const ActivityAttributesEditor = ({ attributes, onChange }: ActivityAttributesEd
                   required
                 />
               </div>
-              <label className="flex flex-col gap-2 text-sm text-slate-200 md:w-56">
-                <span className="font-medium text-slate-100">Typ</span>
+              <label className="flex flex-col gap-2 text-sm text-slate-600 md:w-56">
+                <span className="font-medium text-slate-900">Typ</span>
                 <select
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-slate-900 shadow-sm focus:border-brand-primary/60 focus:outline-none focus:ring-4 focus:ring-brand-primary/10"
                   value={attribute.type}
                   onChange={(event) => {
                     const nextType = event.target.value as ActivityAttributeType;

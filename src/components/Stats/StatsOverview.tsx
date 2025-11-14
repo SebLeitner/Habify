@@ -62,8 +62,8 @@ const StatsOverview = ({ logs, activities }: { logs: LogEntry[]; activities: Act
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="text-lg font-semibold text-white">Heutige Verteilung</h2>
-        <div className="mt-4 h-64 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-lg font-semibold text-slate-900">Heutige Verteilung</h2>
+        <div className="mt-4 h-64 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-200">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie dataKey="count" data={todayRange} nameKey="name" label>
@@ -78,13 +78,13 @@ const StatsOverview = ({ logs, activities }: { logs: LogEntry[]; activities: Act
         </div>
       </section>
       <section>
-        <h2 className="text-lg font-semibold text-white">Aktuelle Woche</h2>
-        <div className="mt-4 h-72 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-lg font-semibold text-slate-900">Aktuelle Woche</h2>
+        <div className="mt-4 h-72 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-200">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weekRange}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="name" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" stroke="#64748b" />
+              <YAxis stroke="#64748b" allowDecimals={false} />
               <Tooltip />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {weekRange.map((entry) => (
@@ -94,7 +94,7 @@ const StatsOverview = ({ logs, activities }: { logs: LogEntry[]; activities: Act
             </BarChart>
           </ResponsiveContainer>
           {!!weekRange.length && (
-            <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-300">
+            <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-600">
               {weekRange.map((entry) => (
                 <div key={entry.name} className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded" style={{ backgroundColor: entry.color }} />
@@ -106,13 +106,13 @@ const StatsOverview = ({ logs, activities }: { logs: LogEntry[]; activities: Act
         </div>
       </section>
       <section>
-        <h2 className="text-lg font-semibold text-white">Monatsverlauf</h2>
-        <div className="mt-4 h-80 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <h2 className="text-lg font-semibold text-slate-900">Monatsverlauf</h2>
+        <div className="mt-4 h-80 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm shadow-slate-200">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={monthRange}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="day" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="day" stroke="#64748b" />
+              <YAxis stroke="#64748b" allowDecimals={false} />
               <Tooltip />
               <Legend />
               {activities.map((activity) => (

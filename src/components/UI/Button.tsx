@@ -1,9 +1,11 @@
 import { ButtonHTMLAttributes } from 'react';
 
 const variants = {
-  primary: 'bg-brand-primary hover:bg-brand-primary/80 text-white',
-  secondary: 'bg-slate-800 hover:bg-slate-700 text-slate-100',
-  ghost: 'bg-transparent hover:bg-slate-800 text-slate-200',
+  primary:
+    'bg-brand-primary text-white shadow-md shadow-brand-primary/20 hover:bg-brand-primary/90 active:scale-[0.99]',
+  secondary:
+    'bg-white text-brand-primary border border-brand-primary/30 hover:bg-brand-primary/10 shadow-sm active:scale-[0.99]',
+  ghost: 'bg-transparent text-brand-primary hover:bg-brand-primary/10',
 };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -12,8 +14,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const Button = ({ variant = 'primary', className = '', ...props }: ButtonProps) => {
   const classes = [
-    'rounded-lg px-4 py-2 text-sm font-semibold transition',
-    'focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900',
+    'rounded-full px-5 py-2 text-sm font-semibold transition-all',
+    'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/20',
+    'disabled:cursor-not-allowed disabled:opacity-60',
     variants[variant],
     className,
   ]

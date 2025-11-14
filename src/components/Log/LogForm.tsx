@@ -48,7 +48,7 @@ const LogForm = ({
   }, [activityId, activities, initialLog]);
 
   if (!activities.length) {
-    return <p className="text-sm text-slate-400">Bitte lege zuerst eine Aktivität an.</p>;
+    return <p className="text-sm text-slate-500">Bitte lege zuerst eine Aktivität an.</p>;
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -72,10 +72,10 @@ const LogForm = ({
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <label className="flex flex-col gap-2 text-sm text-slate-200">
-        <span className="font-medium text-slate-100">Aktivität</span>
+      <label className="flex flex-col gap-2 text-sm text-slate-600">
+        <span className="font-medium text-slate-900">Aktivität</span>
         <select
-          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40"
+          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-slate-900 shadow-sm focus:border-brand-primary/60 focus:outline-none focus:ring-4 focus:ring-brand-primary/10"
           value={activityId}
           onChange={(event) => setActivityId(event.target.value)}
           required

@@ -52,18 +52,18 @@ const ActivityEditorPage = () => {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Editor</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold text-slate-900">Editor</h1>
+          <p className="text-sm text-slate-500">
             Verwalte deine Aktivitäten. Klicke auf eine Karte, um Details zu bearbeiten oder die Aktivität zu löschen.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
             Sortieren nach
             <select
               value={sort}
               onChange={(event) => setSort(event.target.value as 'createdAt' | 'name')}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-slate-900 shadow-sm focus:border-brand-primary/60 focus:outline-none focus:ring-4 focus:ring-brand-primary/10"
             >
               <option value="createdAt">Erstellungsdatum</option>
               <option value="name">Name</option>
@@ -89,8 +89,8 @@ const ActivityEditorPage = () => {
             onClick={() => setCategoryFilter(null)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               categoryFilter === null
-                ? 'bg-brand-primary/20 text-brand-secondary'
-                : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                ? 'bg-brand-primary/10 text-brand-primary shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             Alle
@@ -102,8 +102,8 @@ const ActivityEditorPage = () => {
               onClick={() => setCategoryFilter((current) => (current === category ? null : category))}
               className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                 categoryFilter === category
-                  ? 'bg-brand-primary/20 text-brand-secondary'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  ? 'bg-brand-primary/10 text-brand-primary shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               {category}
@@ -111,7 +111,7 @@ const ActivityEditorPage = () => {
           ))}
         </div>
       )}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-500">{error}</p>}
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Spinner label="Lade Aktivitäten" />
@@ -125,15 +125,15 @@ const ActivityEditorPage = () => {
                 key={activity.id}
                 type="button"
                 onClick={() => setEditing(activity)}
-                className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-left transition hover:border-brand-primary/40 hover:shadow-md hover:shadow-brand-primary/10 focus:outline-none focus:ring-2 focus:ring-brand-secondary/40"
+                className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/90 p-5 text-left shadow-sm shadow-slate-200 transition hover:border-brand-primary/30 hover:shadow-lg hover:shadow-brand-primary/10 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/20"
               >
                 <div className="flex items-start gap-4">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full text-2xl" style={{ backgroundColor: accentColor }}>
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-inner" style={{ backgroundColor: accentColor }}>
                     {activity.icon}
                   </span>
                   <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-white">{activity.name}</h3>
-                    <p className="text-xs text-slate-400">
+                    <h3 className="text-base font-semibold text-slate-900">{activity.name}</h3>
+                    <p className="text-xs text-slate-500">
                       {activity.active ? 'Aktiv' : 'Inaktiv'} • Aktualisiert am {new Date(activity.updatedAt).toLocaleDateString('de-DE')}
                     </p>
                     {activity.categories?.length ? (
@@ -141,7 +141,7 @@ const ActivityEditorPage = () => {
                         {activity.categories.map((category) => (
                           <span
                             key={category}
-                            className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-100"
+                            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
                           >
                             {category}
                           </span>
@@ -151,7 +151,7 @@ const ActivityEditorPage = () => {
                       <span className="text-xs text-slate-500">Keine Kategorien</span>
                     )}
                     {!!activity.attributes.length && (
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs text-slate-500">
                         {activity.attributes.length} Attribute definiert
                       </div>
                     )}
@@ -162,12 +162,12 @@ const ActivityEditorPage = () => {
           })}
         </div>
       ) : (
-        <p className="text-sm text-slate-400">Noch keine Aktivitäten angelegt.</p>
+        <p className="text-sm text-slate-500">Noch keine Aktivitäten angelegt.</p>
       )}
       {editing && (
-        <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-6">
+        <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/60">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Aktivität bearbeiten</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Aktivität bearbeiten</h2>
             <Button variant="ghost" onClick={() => setEditing(null)}>
               Schließen
             </Button>

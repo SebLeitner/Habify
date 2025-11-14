@@ -29,12 +29,12 @@ const DailyHighlights = ({
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-      <h2 className="mb-4 text-lg font-semibold text-white">{title}</h2>
-      {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+    <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/60">
+      <h2 className="mb-4 text-lg font-semibold text-slate-900">{title}</h2>
+      {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
       <div className="space-y-3">
         {highlights.length === 0 ? (
-          <p className="text-sm text-slate-400">{emptyLabel}</p>
+          <p className="text-sm text-slate-500">{emptyLabel}</p>
         ) : (
           highlights.map((highlight) => {
             const titleText = highlight.title?.trim() || highlight.text || 'Highlight';
@@ -43,11 +43,11 @@ const DailyHighlights = ({
             return (
               <div
                 key={highlight.id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-slate-800 bg-slate-900/70 p-4"
+                className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
               >
                 <div>
-                  <h3 className="text-sm font-semibold text-white">{titleText}</h3>
-                  {showDescription && <p className="mt-1 text-sm text-slate-300">{description}</p>}
+                  <h3 className="text-sm font-semibold text-slate-900">{titleText}</h3>
+                  {showDescription && <p className="mt-1 text-sm text-slate-600">{description}</p>}
                 </div>
                 <Button
                   type="button"

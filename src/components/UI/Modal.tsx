@@ -18,17 +18,17 @@ const Modal = ({ triggerLabel, title, description, children }: ModalProps) => {
         <Button variant="secondary">{triggerLabel}</Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <Dialog.Overlay className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-300/60">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold text-white">{title}</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold text-slate-900">{title}</Dialog.Title>
             <Dialog.Close asChild>
-              <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-700 hover:text-white">
+              <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-200 hover:text-slate-600">
                 ✕
               </button>
             </Dialog.Close>
           </div>
-          {description && <Dialog.Description className="mb-4 text-sm text-slate-400">{description}</Dialog.Description>}
+          {description && <Dialog.Description className="mb-4 text-sm text-slate-500">{description}</Dialog.Description>}
           <div className="space-y-4">{children(() => setOpen(false))}</div>
         </Dialog.Content>
       </Dialog.Portal>

@@ -12,16 +12,16 @@ const EmojiPicker = ({ value, onChange }: EmojiPickerProps) => {
 
   return (
     <div>
-      <div className="mb-3 text-sm text-slate-300">
+      <div className="mb-3 text-sm text-slate-500">
         Aktuelles Icon: <span className="text-lg">{value}</span>
       </div>
       <div className="grid grid-cols-7 gap-2">
         {options.map((emoji) => {
-          const classes = ['flex h-10 w-10 items-center justify-center rounded-lg border transition'];
+          const classes = ['flex h-10 w-10 items-center justify-center rounded-2xl border transition bg-white shadow-sm'];
           if (value === emoji) {
-            classes.push('border-brand-secondary bg-brand-primary/20');
+            classes.push('border-brand-primary bg-brand-primary/10');
           } else {
-            classes.push('border-slate-700 hover:border-brand-secondary');
+            classes.push('border-transparent hover:border-brand-primary/40 hover:bg-brand-primary/5');
           }
           return (
             <button key={emoji} type="button" className={classes.join(' ')} onClick={() => onChange(emoji)}>

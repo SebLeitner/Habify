@@ -84,7 +84,7 @@ const ActivityCard = ({
 
   return (
     <div
-      className={`rounded-xl border border-slate-800 bg-slate-900/60 ${dense ? 'p-3' : 'p-4'} shadow-inner`}
+      className={`rounded-3xl border border-slate-200 bg-white/90 ${dense ? 'p-3' : 'p-5'} shadow-sm shadow-slate-200`}
     >
       <div className="flex items-start justify-between gap-3">
         <div
@@ -100,14 +100,14 @@ const ActivityCard = ({
           className="flex flex-1 cursor-pointer items-center gap-4"
         >
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-inner"
             style={{ backgroundColor: accentColor }}
           >
             {activity.icon}
           </span>
           <div className="space-y-1">
-            <h3 className={`font-semibold text-white ${dense ? 'text-sm' : 'text-base'}`}>{activity.name}</h3>
-            <p className="text-xs text-slate-400">
+            <h3 className={`font-semibold text-slate-900 ${dense ? 'text-sm' : 'text-base'}`}>{activity.name}</h3>
+            <p className="text-xs text-slate-500">
               {activity.active ? 'Aktiv' : 'Inaktiv'} • Aktualisiert am{' '}
               {new Date(activity.updatedAt).toLocaleDateString('de-DE')}
             </p>
@@ -116,7 +116,7 @@ const ActivityCard = ({
                 {activity.categories.map((category) => (
                   <span
                     key={category}
-                    className={`rounded-full bg-slate-800 ${dense ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} font-medium text-slate-100`}
+                    className={`rounded-full bg-slate-100 ${dense ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} font-medium text-slate-600`}
                   >
                     {category}
                   </span>
@@ -129,10 +129,10 @@ const ActivityCard = ({
         </div>
       </div>
       {isExpanded && (
-        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-4" onClick={(event) => event.stopPropagation()}>
-          <h4 className="text-sm font-semibold text-white">Eintrag hinzufügen</h4>
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4" onClick={(event) => event.stopPropagation()}>
+          <h4 className="text-sm font-semibold text-slate-900">Eintrag hinzufügen</h4>
           {!dense && (
-            <p className="mb-4 text-xs text-slate-400">
+            <p className="mb-4 text-xs text-slate-500">
               Speichere einen Log-Eintrag für diese Aktivität. Die Werte werden nach dem Speichern automatisch zurückgesetzt.
             </p>
           )}
@@ -152,7 +152,7 @@ const ActivityCard = ({
               placeholder="Optional"
               className="min-h-[80px]"
             />
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-red-500">{error}</p>}
             <div className="flex justify-end">
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? 'Speichern …' : 'Speichern'}
@@ -167,7 +167,7 @@ const ActivityCard = ({
 
 const ActivityQuickLogList = ({ activities, onAddLog, dense = false }: ActivityQuickLogListProps) => {
   if (!activities.length) {
-    return <p className="text-sm text-slate-400">Noch keine Aktivitäten angelegt.</p>;
+    return <p className="text-sm text-slate-500">Noch keine Aktivitäten angelegt.</p>;
   }
 
   return (

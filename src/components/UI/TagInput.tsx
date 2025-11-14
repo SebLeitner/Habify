@@ -63,18 +63,18 @@ const TagInput = ({ label, value, onChange, placeholder, suggestions = [] }: Tag
   };
 
   return (
-    <label className="flex flex-col gap-2 text-sm text-slate-200">
-      <span className="font-medium text-slate-100">{label}</span>
-      <div className="flex min-h-[48px] flex-wrap items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+    <label className="flex flex-col gap-2 text-sm text-slate-600">
+      <span className="font-medium text-slate-900">{label}</span>
+      <div className="flex min-h-[48px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
         {normalizedTags.map((tag) => (
           <span
             key={tag}
-            className="flex items-center gap-2 rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-100"
+            className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
           >
             {tag}
             <button
               type="button"
-              className="rounded-full px-1 text-slate-400 transition hover:bg-slate-700 hover:text-white"
+              className="rounded-full px-1 text-slate-400 transition hover:bg-white hover:text-brand-primary"
               onClick={() => removeTag(tag)}
               aria-label={`${tag} entfernen`}
             >
@@ -83,7 +83,7 @@ const TagInput = ({ label, value, onChange, placeholder, suggestions = [] }: Tag
           </span>
         ))}
         <input
-          className="flex-1 min-w-[120px] border-none bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+          className="flex-1 min-w-[120px] border-none bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
           value={inputValue}
           onChange={(event) => {
             const value = event.target.value;
@@ -106,7 +106,7 @@ const TagInput = ({ label, value, onChange, placeholder, suggestions = [] }: Tag
             <button
               key={suggestion}
               type="button"
-              className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-200"
               onClick={() => addTag(suggestion)}
             >
               {suggestion}

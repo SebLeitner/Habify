@@ -33,17 +33,17 @@ const ActivitiesPage = () => {
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           placeholder="Suchen"
-          className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40 sm:max-w-xs"
+          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-brand-primary/60 focus:outline-none focus:ring-4 focus:ring-brand-primary/10 sm:max-w-xs"
         />
         {categories.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setCategoryFilter(null)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              className={`rounded-full px-4 py-1 text-xs font-medium transition ${
                 categoryFilter === null
-                  ? 'bg-brand-primary/20 text-brand-secondary'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                  ? 'bg-brand-primary/10 text-brand-primary shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               Alle
@@ -53,10 +53,10 @@ const ActivitiesPage = () => {
                 key={category}
                 type="button"
                 onClick={() => setCategoryFilter((current) => (current === category ? null : category))}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                className={`rounded-full px-4 py-1 text-xs font-medium transition ${
                   categoryFilter === category
-                    ? 'bg-brand-primary/20 text-brand-secondary'
-                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                    ? 'bg-brand-primary/10 text-brand-primary shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 {category}
@@ -65,7 +65,7 @@ const ActivitiesPage = () => {
           </div>
         )}
       </div>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-500">{error}</p>}
       {isLoading ? (
         <div className="flex justify-center py-8">
           <Spinner label="Lade Aktivitäten" />

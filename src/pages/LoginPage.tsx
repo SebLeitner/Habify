@@ -34,9 +34,9 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-md rounded-xl border border-slate-800 bg-slate-900/70 p-8 shadow-xl shadow-black/40">
-      <h1 className="text-2xl font-bold text-white">{mode === 'login' ? 'Einloggen' : 'Registrieren'}</h1>
-      <p className="mt-2 text-sm text-slate-400">
+    <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-2xl shadow-slate-200/60">
+      <h1 className="text-2xl font-bold text-slate-900">{mode === 'login' ? 'Einloggen' : 'Registrieren'}</h1>
+      <p className="mt-2 text-sm text-slate-500">
         Nutze deine E-Mail-Adresse, um dich bei Habify anzumelden.
       </p>
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -56,16 +56,16 @@ const LoginPage = () => {
           onChange={(event) => setPassword(event.target.value)}
           required
         />
-        {error && <div className="rounded-lg border border-red-500/60 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
+        {error && <div className="rounded-2xl border border-red-500/40 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? 'Bitte warten…' : mode === 'login' ? 'Einloggen' : 'Konto erstellen'}
         </Button>
       </form>
-      <div className="mt-6 text-sm text-slate-300">
+      <div className="mt-6 text-sm text-slate-600">
         {mode === 'login' ? (
           <button
             type="button"
-            className="text-brand-secondary hover:text-brand-primary"
+            className="font-medium text-brand-primary hover:text-brand-secondary"
             onClick={() => setMode('register')}
           >
             Noch kein Konto? Jetzt registrieren
@@ -73,7 +73,7 @@ const LoginPage = () => {
         ) : (
           <button
             type="button"
-            className="text-brand-secondary hover:text-brand-primary"
+            className="font-medium text-brand-primary hover:text-brand-secondary"
             onClick={() => setMode('login')}
           >
             Bereits registriert? Hier einloggen

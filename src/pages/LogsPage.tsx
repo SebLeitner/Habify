@@ -72,13 +72,13 @@ const LogsPage = () => {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Logbuch</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold text-slate-900">Logbuch</h1>
+          <p className="text-sm text-slate-500">
             Wechsle den Tag mit den Pfeilen oder wähle ein Datum aus, um alle Aktivitäten chronologisch zu sehen.
           </p>
         </div>
-        <div className="flex flex-col gap-3 text-sm text-slate-300 md:flex-row md:items-center">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+        <div className="flex flex-col gap-3 text-sm text-slate-600 md:flex-row md:items-center">
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 p-2 shadow-sm shadow-slate-200">
             <Button
               type="button"
               variant="ghost"
@@ -88,7 +88,7 @@ const LogsPage = () => {
             >
               ←
             </Button>
-            <span className="min-w-[200px] text-center text-base font-semibold text-white">{formattedDateLabel}</span>
+            <span className="min-w-[200px] text-center text-base font-semibold text-slate-900">{formattedDateLabel}</span>
             <Button
               type="button"
               variant="ghost"
@@ -100,18 +100,18 @@ const LogsPage = () => {
               →
             </Button>
           </div>
-          <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-400">
+          <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
             Datum wählen
             <input
               type="date"
               value={datePickerValue}
               onChange={handleDatePickerChange}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-brand-primary/60 focus:outline-none focus:ring-4 focus:ring-brand-primary/10"
             />
           </label>
         </div>
       </header>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-500">{error}</p>}
       <DailyHighlights
         highlights={highlightsForSelectedDate}
         onDelete={handleDeleteHighlight}

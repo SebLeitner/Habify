@@ -89,15 +89,15 @@ const HighlightsPage = () => {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-white">Highlights</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-2xl font-bold text-slate-900">Highlights</h1>
+        <p className="text-sm text-slate-500">
           Sammle deine besonderen Momente und weise ihnen einen Tag zu. Du kannst Highlights benennen und bei
           Bedarf wieder entfernen.
         </p>
       </header>
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-        <h2 className="text-lg font-semibold text-white">Neues Highlight festhalten</h2>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/60">
+        <h2 className="text-lg font-semibold text-slate-900">Neues Highlight festhalten</h2>
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
           <Input
             label="Titel"
@@ -106,13 +106,13 @@ const HighlightsPage = () => {
             placeholder="Wie heißt dein Highlight?"
             required
           />
-          <label className="block text-sm font-medium text-slate-200">
+          <label className="block text-sm font-medium text-slate-900">
             Datum
             <input
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 shadow-sm focus:border-brand-primary/60 focus:outline-none focus:ring-4 focus:ring-brand-primary/10"
               required
             />
           </label>
@@ -124,7 +124,7 @@ const HighlightsPage = () => {
             rows={4}
             required
           />
-          {formError && <p className="text-sm text-red-400">{formError}</p>}
+          {formError && <p className="text-sm text-red-500">{formError}</p>}
           <div className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Speichern…' : 'Highlight hinzufügen'}
@@ -138,7 +138,7 @@ const HighlightsPage = () => {
             <Spinner label="Lade Highlights" />
           </div>
         ) : groupedHighlights.length === 0 ? (
-          <p className="text-sm text-slate-400">Du hast noch keine Highlights gespeichert.</p>
+          <p className="text-sm text-slate-500">Du hast noch keine Highlights gespeichert.</p>
         ) : (
           groupedHighlights.map(({ date: highlightDate, items }) => {
             const heading = format(parseISO(highlightDate), 'EEEE, dd. MMMM yyyy', { locale: de });

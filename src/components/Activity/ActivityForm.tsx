@@ -8,7 +8,7 @@ import TagInput from '../UI/TagInput';
 import ActivityAttributesEditor from './ActivityAttributesEditor';
 import type { ActivityAttribute } from '../../types';
 
-const defaultColor = '#4f46e5';
+const defaultColor = '#007aff';
 
 const ActivityForm = ({
   initialActivity,
@@ -74,10 +74,10 @@ const ActivityForm = ({
         suggestions={existingCategories}
       />
       <ActivityAttributesEditor attributes={attributes} onChange={setAttributes} />
-      <label className="flex items-center gap-3 text-sm text-slate-200">
+      <label className="flex items-center gap-3 text-sm text-slate-600">
         <input
           type="checkbox"
-          className="h-5 w-5 rounded border-slate-600 bg-slate-900"
+          className="h-5 w-5 rounded border-slate-300 bg-white text-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
           checked={active}
           onChange={(event) => setActive(event.target.checked)}
         />

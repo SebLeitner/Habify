@@ -75,7 +75,7 @@ const LogList = ({
   onDelete?: (log: LogEntry) => void;
 }) => {
   if (!logs.length) {
-    return <p className="text-sm text-slate-400">Noch keine Einträge an diesem Tag.</p>;
+    return <p className="text-sm text-slate-500">Noch keine Einträge an diesem Tag.</p>;
   }
 
   const activityById = new Map(activities.map((activity) => [activity.id, activity]));
@@ -88,18 +88,18 @@ const LogList = ({
         return (
           <div
             key={log.id}
-            className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:flex-row md:items-center md:justify-between"
+            className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200 md:flex-row md:items-center md:justify-between"
           >
             <div className="flex items-center gap-4">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full text-2xl" style={{ backgroundColor: accentColor }}>
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl shadow-inner" style={{ backgroundColor: accentColor }}>
                 {activity?.icon ?? '📌'}
               </span>
               <div>
-                <h3 className="text-base font-semibold text-white">{activity?.name ?? 'Unbekannte Aktivität'}</h3>
-                <p className="text-xs text-slate-400">{formatTimestamp(log.timestamp)}</p>
-                {log.note && <p className="mt-2 text-sm text-slate-300">{log.note}</p>}
+                <h3 className="text-base font-semibold text-slate-900">{activity?.name ?? 'Unbekannte Aktivität'}</h3>
+                <p className="text-xs text-slate-500">{formatTimestamp(log.timestamp)}</p>
+                {log.note && <p className="mt-2 text-sm text-slate-600">{log.note}</p>}
                 {!!log.attributes?.length && (
-                  <div className="mt-3 space-y-1 text-xs text-slate-300">
+                  <div className="mt-3 space-y-1 text-xs text-slate-600">
                     {log.attributes.map((attributeValue) => {
                       const activityAttribute = activity?.attributes.find(
                         (attr) => attr.id === attributeValue.attributeId,
@@ -110,7 +110,7 @@ const LogList = ({
                       }
                       return (
                         <div key={`${log.id}-${attributeValue.attributeId}`}>
-                          <span className="font-semibold text-slate-200">
+                          <span className="font-semibold text-slate-700">
                             {activityAttribute?.name ?? 'Attribut'}:
                           </span>{' '}
                           <span>{formatted}</span>
