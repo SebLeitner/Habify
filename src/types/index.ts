@@ -55,6 +55,7 @@ export type LogEntry = {
 export type DailyHighlight = {
   id: string;
   date: string;
+  title: string;
   text: string;
   userId: string;
   createdAt: string;
