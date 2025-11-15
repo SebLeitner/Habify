@@ -19,17 +19,23 @@ const Modal = ({ triggerLabel, title, description, children }: ModalProps) => {
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold text-white">{title}</Dialog.Title>
-            <Dialog.Close asChild>
-              <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-700 hover:text-white">
-                ✕
-              </button>
-            </Dialog.Close>
+        <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl focus:outline-none">
+          <div className="flex max-h-[85vh] flex-col">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4">
+              <Dialog.Title className="text-lg font-semibold text-white">{title}</Dialog.Title>
+              <Dialog.Close asChild>
+                <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-700 hover:text-white">
+                  ✕
+                </button>
+              </Dialog.Close>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              <div className="space-y-4 pt-4">
+                {description && <Dialog.Description className="text-sm text-slate-400">{description}</Dialog.Description>}
+                {children(() => setOpen(false))}
+              </div>
+            </div>
           </div>
-          {description && <Dialog.Description className="mb-4 text-sm text-slate-400">{description}</Dialog.Description>}
-          <div className="space-y-4">{children(() => setOpen(false))}</div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import DailyHighlights from '../components/Log/DailyHighlights';
@@ -7,6 +7,8 @@ import Input from '../components/UI/Input';
 import TextArea from '../components/UI/TextArea';
 import Spinner from '../components/UI/Spinner';
 import { DailyHighlight, useData } from '../contexts/DataContext';
+import { formatDateForDisplay, parseDisplayDateToISO } from '../utils/datetime';
+import { isFirefox } from '../utils/browser';
 
 const todayAsString = () => format(new Date(), 'yyyy-MM-dd');
 
@@ -14,9 +16,26 @@ const HighlightsPage = () => {
   const { state, addHighlight, deleteHighlight, isLoading, error } = useData();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
-  const [date, setDate] = useState(todayAsString());
+  const firefox = isFirefox();
+  const initialDate = todayAsString();
+  const [date, setDate] = useState(initialDate);
+  const [firefoxDateInput, setFirefoxDateInput] = useState(() =>
+    firefox ? formatDateForDisplay(initialDate) : '',
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.target;
+    if (firefox) {
+      setFirefoxDateInput(value);
+      const parsed = parseDisplayDateToISO(value);
+      setDate(parsed);
+      return;
+    }
+
+    setDate(value);
+  };
 
   const groupedHighlights = useMemo(() => {
     const buckets = new Map<string, DailyHighlight[]>();
@@ -109,11 +128,13 @@ const HighlightsPage = () => {
           <label className="block text-sm font-medium text-slate-200">
             Datum
             <input
-              type="date"
+              type={firefox ? 'text' : 'date'}
               lang="de-DE"
               inputMode="numeric"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
+              placeholder={firefox ? 'TT.MM.JJJJ' : undefined}
+              pattern={firefox ? '\\d{2}\\.\\d{2}\\.\\d{4}' : undefined}
+              value={firefox ? firefoxDateInput : date}
+              onChange={handleDateChange}
               className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
               required
             />

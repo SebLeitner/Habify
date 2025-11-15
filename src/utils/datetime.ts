@@ -26,3 +26,53 @@ export const currentLocalTime = () => {
 export const combineDateAndTimeToISO = (date: string, time: string) => {
   return new Date(`${date}T${time}`).toISOString();
 };
+
+export const formatDateForDisplay = (isoDate: string | null | undefined) => {
+  if (!isoDate) {
+    return '';
+  }
+
+  const [year, month, day] = isoDate.split('-');
+  if (!year || !month || !day) {
+    return '';
+  }
+
+  return `${day}.${month}.${year}`;
+};
+
+export const parseDisplayDateToISO = (displayValue: string) => {
+  const trimmedValue = displayValue.trim();
+  if (!trimmedValue) {
+    return '';
+  }
+
+  const match = trimmedValue.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) {
+    return '';
+  }
+
+  const [, day, month, year] = match;
+  const isoDate = `${year}-${month}-${day}`;
+  const parsed = new Date(isoDate);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  return isoDate;
+};
+
+export const parseDisplayTimeToISO = (displayValue: string) => {
+  const trimmedValue = displayValue.trim();
+  if (!trimmedValue) {
+    return '';
+  }
+
+  const match = trimmedValue.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) {
+    return '';
+  }
+
+  const [, hours, minutes] = match;
+  return `${hours}:${minutes}`;
+};

@@ -1,4 +1,4 @@
-import { ChangeEvent, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { addDays, endOfDay, format, isAfter, isSameDay, startOfDay } from 'date-fns';
 import { de } from 'date-fns/locale';
 import LogList from '../components/Log/LogList';
@@ -6,11 +6,26 @@ import Button from '../components/UI/Button';
 import Spinner from '../components/UI/Spinner';
 import DailyHighlights from '../components/Log/DailyHighlights';
 import { type DailyHighlight, LogEntry, useData } from '../contexts/DataContext';
+import { formatDateForDisplay, parseDisplayDateToISO } from '../utils/datetime';
+import { isFirefox } from '../utils/browser';
 
 const LogsPage = () => {
   const { state, deleteLog, deleteHighlight, isLoading, error } = useData();
+  const firefox = isFirefox();
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
+  const [firefoxDatePickerValue, setFirefoxDatePickerValue] = useState(() =>
+    firefox ? formatDateForDisplay(format(startOfDay(new Date()), 'yyyy-MM-dd')) : '',
+  );
   const [highlightError, setHighlightError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!firefox) {
+      return;
+    }
+
+    const isoDate = format(selectedDate, 'yyyy-MM-dd');
+    setFirefoxDatePickerValue(formatDateForDisplay(isoDate));
+  }, [firefox, selectedDate]);
 
   const filteredLogs = useMemo(() => {
     const start = startOfDay(selectedDate);
@@ -33,7 +48,26 @@ const LogsPage = () => {
 
   const handleDatePickerChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { value } = event.target;
-    if (!value) return;
+    if (!value) {
+      if (firefox) {
+        setFirefoxDatePickerValue('');
+      }
+      return;
+    }
+
+    if (firefox) {
+      setFirefoxDatePickerValue(value);
+      const parsed = parseDisplayDateToISO(value);
+      if (!parsed) {
+        return;
+      }
+      const nextDate = startOfDay(new Date(parsed));
+      if (!Number.isNaN(nextDate.getTime())) {
+        setSelectedDate(nextDate);
+      }
+      return;
+    }
+
     const nextDate = startOfDay(new Date(value));
     if (!Number.isNaN(nextDate.getTime())) {
       setSelectedDate(nextDate);
@@ -103,10 +137,12 @@ const LogsPage = () => {
           <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-400">
             Datum wählen
             <input
-              type="date"
+              type={firefox ? 'text' : 'date'}
               lang="de-DE"
               inputMode="numeric"
-              value={datePickerValue}
+              placeholder={firefox ? 'TT.MM.JJJJ' : undefined}
+              pattern={firefox ? '\\d{2}\\.\\d{2}\\.\\d{4}' : undefined}
+              value={firefox ? firefoxDatePickerValue : datePickerValue}
               onChange={handleDatePickerChange}
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
             />
