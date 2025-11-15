@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import { Activity, LogEntry } from '../../contexts/DataContext';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
@@ -7,11 +7,15 @@ import {
   combineDateAndTimeToISO,
   currentLocalDate,
   currentLocalTime,
+  formatDateForDisplay,
+  parseDisplayDateToISO,
+  parseDisplayTimeToISO,
   toLocalDateInput,
   toLocalTimeInput,
 } from '../../utils/datetime';
 import AttributeValuesForm from './AttributeValuesForm';
 import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
+import { isFirefox } from '../../utils/browser';
 
 const LogForm = ({
   activities,
@@ -29,14 +33,17 @@ const LogForm = ({
   }) => void | Promise<void>;
   onCancel?: () => void;
 }) => {
+  const firefox = isFirefox();
   const defaultActivityId = activities[0]?.id ?? '';
+  const initialDate = initialLog ? toLocalDateInput(initialLog.timestamp) : currentLocalDate();
+  const initialTime = initialLog ? toLocalTimeInput(initialLog.timestamp) : currentLocalTime();
   const [activityId, setActivityId] = useState(initialLog?.activityId ?? defaultActivityId);
-  const [date, setDate] = useState(
-    initialLog ? toLocalDateInput(initialLog.timestamp) : currentLocalDate(),
+  const [date, setDate] = useState(initialDate);
+  const [time, setTime] = useState(initialTime);
+  const [firefoxDateInput, setFirefoxDateInput] = useState(() =>
+    firefox ? formatDateForDisplay(initialDate) : '',
   );
-  const [time, setTime] = useState(
-    initialLog ? toLocalTimeInput(initialLog.timestamp) : currentLocalTime(),
-  );
+  const [firefoxTimeInput, setFirefoxTimeInput] = useState(() => (firefox ? initialTime : ''));
   const [note, setNote] = useState(initialLog?.note ?? '');
   const [drafts, setDrafts] = useState<AttributeValueDraft[]>(() => {
     const activity = activities.find((item) => item.id === (initialLog?.activityId ?? defaultActivityId));
@@ -56,6 +63,17 @@ const LogForm = ({
     });
   }, [activityId, activities, initialLog]);
 
+  useEffect(() => {
+    const nextDate = initialLog ? toLocalDateInput(initialLog.timestamp) : currentLocalDate();
+    const nextTime = initialLog ? toLocalTimeInput(initialLog.timestamp) : currentLocalTime();
+    setDate(nextDate);
+    setTime(nextTime);
+    if (firefox) {
+      setFirefoxDateInput(formatDateForDisplay(nextDate));
+      setFirefoxTimeInput(nextTime);
+    }
+  }, [firefox, initialLog]);
+
   if (!activities.length) {
     return <p className="text-sm text-slate-400">Bitte lege zuerst eine Aktivität an.</p>;
   }
@@ -73,11 +91,41 @@ const LogForm = ({
     });
     if (!initialLog) {
       setActivityId(activities[0]?.id ?? '');
-      setDate(currentLocalDate());
-      setTime(currentLocalTime());
+      const resetDate = currentLocalDate();
+      const resetTime = currentLocalTime();
+      setDate(resetDate);
+      setTime(resetTime);
+      if (firefox) {
+        setFirefoxDateInput(formatDateForDisplay(resetDate));
+        setFirefoxTimeInput(resetTime);
+      }
       setNote('');
       setDrafts(selectedActivity ? emptyDrafts(selectedActivity.attributes) : []);
     }
+  };
+
+  const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.target;
+    if (firefox) {
+      setFirefoxDateInput(value);
+      const parsed = parseDisplayDateToISO(value);
+      setDate(parsed);
+      return;
+    }
+
+    setDate(value);
+  };
+
+  const handleTimeChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.target;
+    if (firefox) {
+      setFirefoxTimeInput(value);
+      const parsed = parseDisplayTimeToISO(value);
+      setTime(parsed);
+      return;
+    }
+
+    setTime(value);
   };
 
   return (
@@ -100,20 +148,24 @@ const LogForm = ({
       <div className="grid gap-3 sm:grid-cols-2">
         <Input
           label="Datum"
-          type="date"
+          type={firefox ? 'text' : 'date'}
           lang="de-DE"
           inputMode="numeric"
-          value={date}
-          onChange={(event) => setDate(event.target.value)}
+          placeholder={firefox ? 'TT.MM.JJJJ' : undefined}
+          pattern={firefox ? '\\d{2}\\.\\d{2}\\.\\d{4}' : undefined}
+          value={firefox ? firefoxDateInput : date}
+          onChange={handleDateChange}
           required
         />
         <Input
           label="Uhrzeit"
-          type="time"
+          type={firefox ? 'text' : 'time'}
           lang="de-DE"
           inputMode="numeric"
-          value={time}
-          onChange={(event) => setTime(event.target.value)}
+          placeholder={firefox ? 'HH:MM' : undefined}
+          pattern={firefox ? '([01]\\d|2[0-3]):([0-5]\\d)' : undefined}
+          value={firefox ? firefoxTimeInput : time}
+          onChange={handleTimeChange}
           required
         />
       </div>
