@@ -67,6 +67,8 @@ const AttributeValuesForm = ({ attributes, drafts, onChange }: AttributeValuesFo
               <Input
                 label={`${attribute.name} (Start)`}
                 type="time"
+                lang="de-DE"
+                inputMode="numeric"
                 value={draft.start}
                 onChange={(event) =>
                   onChange(
@@ -81,6 +83,8 @@ const AttributeValuesForm = ({ attributes, drafts, onChange }: AttributeValuesFo
               <Input
                 label={`${attribute.name} (Ende)`}
                 type="time"
+                lang="de-DE"
+                inputMode="numeric"
                 value={draft.end}
                 onChange={(event) =>
                   onChange(

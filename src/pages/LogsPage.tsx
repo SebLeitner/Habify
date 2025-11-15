@@ -104,6 +104,8 @@ const LogsPage = () => {
             Datum wählen
             <input
               type="date"
+              lang="de-DE"
+              inputMode="numeric"
               value={datePickerValue}
               onChange={handleDatePickerChange}
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import ActivityForm from '../components/Activity/ActivityForm';
 import Button from '../components/UI/Button';
 import Modal from '../components/UI/Modal';
@@ -45,7 +46,9 @@ const ActivityEditorPage = () => {
   const handleDelete = async (activity: Activity) => {
     if (window.confirm(`Aktivität "${activity.name}" löschen?`)) {
       await deleteActivity(activity.id);
+      return true;
     }
+    return false;
   };
 
   return (
@@ -164,36 +167,47 @@ const ActivityEditorPage = () => {
       ) : (
         <p className="text-sm text-slate-400">Noch keine Aktivitäten angelegt.</p>
       )}
-      {editing && (
-        <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Aktivität bearbeiten</h2>
-            <Button variant="ghost" onClick={() => setEditing(null)}>
-              Schließen
-            </Button>
-          </div>
-          <ActivityForm
-            initialActivity={editing}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditing(null)}
-            existingCategories={categories}
-          />
-          <div className="mt-4 flex justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={async () => {
-                if (editing) {
-                  await handleDelete(editing);
-                  setEditing(null);
-                }
-              }}
-            >
-              Aktivität löschen
-            </Button>
-          </div>
-        </div>
-      )}
+      <Dialog.Root open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+            {editing && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <Dialog.Title className="text-lg font-semibold text-white">Aktivität bearbeiten</Dialog.Title>
+                  <Dialog.Close asChild>
+                    <Button type="button" variant="ghost" onClick={() => setEditing(null)}>
+                      Schließen
+                    </Button>
+                  </Dialog.Close>
+                </div>
+                <ActivityForm
+                  initialActivity={editing}
+                  onSubmit={handleUpdate}
+                  onCancel={() => setEditing(null)}
+                  existingCategories={categories}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={async () => {
+                      if (editing) {
+                        const deleted = await handleDelete(editing);
+                        if (deleted) {
+                          setEditing(null);
+                        }
+                      }
+                    }}
+                  >
+                    Aktivität löschen
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 };
