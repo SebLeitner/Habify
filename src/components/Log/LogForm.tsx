@@ -3,7 +3,13 @@ import { Activity, LogEntry } from '../../contexts/DataContext';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
 import TextArea from '../UI/TextArea';
-import { currentDateTimeLocal, toLocalDateTimeInput } from '../../utils/datetime';
+import {
+  combineDateAndTimeToISO,
+  currentLocalDate,
+  currentLocalTime,
+  toLocalDateInput,
+  toLocalTimeInput,
+} from '../../utils/datetime';
 import AttributeValuesForm from './AttributeValuesForm';
 import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 
@@ -25,8 +31,11 @@ const LogForm = ({
 }) => {
   const defaultActivityId = activities[0]?.id ?? '';
   const [activityId, setActivityId] = useState(initialLog?.activityId ?? defaultActivityId);
-  const [timestamp, setTimestamp] = useState(
-    initialLog ? toLocalDateTimeInput(initialLog.timestamp) : currentDateTimeLocal(),
+  const [date, setDate] = useState(
+    initialLog ? toLocalDateInput(initialLog.timestamp) : currentLocalDate(),
+  );
+  const [time, setTime] = useState(
+    initialLog ? toLocalTimeInput(initialLog.timestamp) : currentLocalTime(),
   );
   const [note, setNote] = useState(initialLog?.note ?? '');
   const [drafts, setDrafts] = useState<AttributeValueDraft[]>(() => {
@@ -53,8 +62,8 @@ const LogForm = ({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!activityId) return;
-    const isoTimestamp = new Date(timestamp).toISOString();
+    if (!activityId || !date || !time) return;
+    const isoTimestamp = combineDateAndTimeToISO(date, time);
     const attributeValues = serializeDrafts(drafts);
     await onSubmit({
       activityId,
@@ -64,7 +73,8 @@ const LogForm = ({
     });
     if (!initialLog) {
       setActivityId(activities[0]?.id ?? '');
-      setTimestamp(currentDateTimeLocal());
+      setDate(currentLocalDate());
+      setTime(currentLocalTime());
       setNote('');
       setDrafts(selectedActivity ? emptyDrafts(selectedActivity.attributes) : []);
     }
@@ -87,13 +97,22 @@ const LogForm = ({
           ))}
         </select>
       </label>
-      <Input
-        label="Zeitpunkt"
-        type="datetime-local"
-        value={timestamp}
-        onChange={(event) => setTimestamp(event.target.value)}
-        required
-      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input
+          label="Datum"
+          type="date"
+          value={date}
+          onChange={(event) => setDate(event.target.value)}
+          required
+        />
+        <Input
+          label="Uhrzeit"
+          type="time"
+          value={time}
+          onChange={(event) => setTime(event.target.value)}
+          required
+        />
+      </div>
       <AttributeValuesForm attributes={selectedActivity.attributes} drafts={drafts} onChange={setDrafts} />
       <TextArea label="Notiz" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
       <div className="flex items-center justify-end gap-3">

@@ -3,7 +3,11 @@ import { Activity } from '../../contexts/DataContext';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
 import TextArea from '../UI/TextArea';
-import { currentDateTimeLocal } from '../../utils/datetime';
+import {
+  combineDateAndTimeToISO,
+  currentLocalDate,
+  currentLocalTime,
+} from '../../utils/datetime';
 import AttributeValuesForm from '../Log/AttributeValuesForm';
 import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 import type { LogAttributeValue } from '../../types';
@@ -29,7 +33,8 @@ const ActivityCard = ({
   dense?: boolean;
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [timestamp, setTimestamp] = useState(currentDateTimeLocal());
+  const [date, setDate] = useState(currentLocalDate());
+  const [time, setTime] = useState(currentLocalTime());
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +54,8 @@ const ActivityCard = ({
     setIsExpanded((previous) => {
       const next = !previous;
       if (next) {
-        setTimestamp(currentDateTimeLocal());
+        setDate(currentLocalDate());
+        setTime(currentLocalTime());
         setDrafts(toDrafts(activity.attributes));
       }
       return next;
@@ -61,14 +67,18 @@ const ActivityCard = ({
     setIsSaving(true);
     try {
       const attributeValues = serializeDrafts(drafts);
+      if (!date || !time) {
+        throw new Error('Bitte Datum und Uhrzeit auswählen.');
+      }
       await onAddLog({
         activityId: activity.id,
-        timestamp: new Date(timestamp).toISOString(),
+        timestamp: combineDateAndTimeToISO(date, time),
         note: note.trim() ? note.trim() : undefined,
         attributes: attributeValues.length ? attributeValues : undefined,
       });
       setNote('');
-      setTimestamp(currentDateTimeLocal());
+      setDate(currentLocalDate());
+      setTime(currentLocalTime());
       setDrafts(emptyDrafts(activity.attributes));
       setIsExpanded(false);
       setError(null);
@@ -137,13 +147,22 @@ const ActivityCard = ({
             </p>
           )}
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <Input
-              label="Zeitpunkt"
-              type="datetime-local"
-              value={timestamp}
-              onChange={(event) => setTimestamp(event.target.value)}
-              required
-            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input
+                label="Datum"
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                required
+              />
+              <Input
+                label="Uhrzeit"
+                type="time"
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
+                required
+              />
+            </div>
             <AttributeValuesForm attributes={activity.attributes} drafts={drafts} onChange={setDrafts} />
             <TextArea
               label="Notiz"
