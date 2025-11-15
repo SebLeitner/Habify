@@ -151,6 +151,8 @@ const ActivityCard = ({
               <Input
                 label="Datum"
                 type="date"
+                lang="de-DE"
+                inputMode="numeric"
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
                 required
@@ -158,6 +160,8 @@ const ActivityCard = ({
               <Input
                 label="Uhrzeit"
                 type="time"
+                lang="de-DE"
+                inputMode="numeric"
                 value={time}
                 onChange={(event) => setTime(event.target.value)}
                 required
