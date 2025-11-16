@@ -37,6 +37,12 @@ npm run dev
 
 Die App ist anschließend unter http://localhost:5173 erreichbar. Für die Anmeldung wird das Cognito-Hosted-UI verwendet (siehe `DEV_README.md`).
 
+### Mobile-optimierte Oberfläche
+
+Für iOS steht eine reduzierte Oberfläche mit Fokus auf „Aktivität eingeben“ und „Logbuch anzeigen“ bereit. Im lokalen Dev-Server ist
+sie unter http://localhost:5173/mobile.html erreichbar. Diese Variante nutzt die gleichen Cognito-/API-Integrationen wie die Desktop-Version,
+ist aber auf Touch-Bedienung und schnelle Eingabe optimiert.
+
 ### Build & Preview
 
 ```bash
