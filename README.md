@@ -1,6 +1,6 @@
 # Habify
 
-Habify ist eine moderne Habit-Tracking-Anwendung, die komplett serverlos auf AWS betrieben wird. Dieses Repository enthält ein React-Frontend (Vite + TypeScript) sowie Terraform-Code für die Infrastruktur (S3, CloudFront, DynamoDB, Lambda, API Gateway und Cognito-Integration). Die App ermöglicht das Verwalten von Aktivitäten, das Erstellen von Logbuch-Einträgen, die Visualisierung von Statistiken und eine einfache Authentifizierung via Mock-Cognito.
+Habify ist eine moderne Habit-Tracking-Anwendung, die komplett serverlos auf AWS betrieben wird. Dieses Repository enthält ein React-Frontend (Vite + TypeScript) sowie Terraform-Code für die Infrastruktur (S3, CloudFront, DynamoDB, Lambda, API Gateway und Cognito-Integration). Die App ermöglicht das Verwalten von Aktivitäten, das Erstellen von Logbuch-Einträgen, die Visualisierung von Statistiken und eine Authentifizierung über AWS Cognito.
 
 ## Projektstruktur
 
@@ -35,7 +35,7 @@ npm install
 npm run dev
 ```
 
-Die App ist anschließend unter http://localhost:5173 erreichbar. Ein Mock-Login erlaubt das Testen sämtlicher Funktionen ohne echte Cognito-Anbindung.
+Die App ist anschließend unter http://localhost:5173 erreichbar. Für die Anmeldung wird das Cognito-Hosted-UI verwendet (siehe `DEV_README.md`).
 
 ### Build & Preview
 

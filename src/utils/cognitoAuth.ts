@@ -1,0 +1,238 @@
+import { AuthUser } from '../types/auth';
+
+const SESSION_KEY = 'habify-cognito-session';
+const PKCE_STATE_KEY = 'habify-cognito-pkce-state';
+
+export type CognitoSession = {
+  idToken: string;
+  accessToken: string;
+  refreshToken: string | null;
+  expiresAt: number;
+};
+
+export type AuthRedirectState = {
+  redirectPath?: string;
+  codeVerifier: string;
+};
+
+const getEnv = () => {
+  const domain = import.meta.env.VITE_COGNITO_DOMAIN?.replace(/\/$/, '');
+  const clientId = import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID;
+  const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI ?? `${window.location.origin}/login`;
+
+  if (!domain) {
+    throw new Error('VITE_COGNITO_DOMAIN ist nicht gesetzt.');
+  }
+  if (!clientId) {
+    throw new Error('VITE_COGNITO_USER_POOL_CLIENT_ID ist nicht gesetzt.');
+  }
+
+  return { domain, clientId, redirectUri };
+};
+
+const encodeState = (state: AuthRedirectState) => btoa(JSON.stringify(state));
+const decodeState = (value: string): AuthRedirectState | null => {
+  try {
+    return JSON.parse(atob(value)) as AuthRedirectState;
+  } catch (error) {
+    console.error('State konnte nicht dekodiert werden', error);
+    return null;
+  }
+};
+
+const toBase64Url = (buffer: ArrayBuffer) =>
+  btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+const sha256 = async (input: string) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return toBase64Url(digest);
+};
+
+export const createPkce = async (): Promise<{ codeVerifier: string; codeChallenge: string }> => {
+  const randomValues = crypto.getRandomValues(new Uint8Array(32));
+  const codeVerifier = toBase64Url(randomValues.buffer);
+  const codeChallenge = await sha256(codeVerifier);
+  return { codeVerifier, codeChallenge };
+};
+
+export const buildAuthorizeUrl = async (mode: 'login' | 'register', redirectPath?: string) => {
+  const { domain, clientId, redirectUri } = getEnv();
+  const { codeVerifier, codeChallenge } = await createPkce();
+  const state = encodeState({ codeVerifier, redirectPath });
+  sessionStorage.setItem(PKCE_STATE_KEY, state);
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: 'email openid profile',
+    state,
+    code_challenge_method: 'S256',
+    code_challenge: codeChallenge,
+  });
+
+  if (mode === 'register') {
+    params.append('screen_hint', 'signup');
+  }
+
+  return `${domain}/oauth2/authorize?${params.toString()}`;
+};
+
+export const clearPkceState = () => sessionStorage.removeItem(PKCE_STATE_KEY);
+
+const decodeJwtPayload = (token: string) => {
+  const payload = token.split('.')[1];
+  const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+  return JSON.parse(decoded) as Record<string, unknown>;
+};
+
+const mapIdTokenToUser = (idToken: string, fallbackEmail?: string): AuthUser => {
+  const payload = decodeJwtPayload(idToken);
+  return {
+    id: (payload.sub as string) ?? 'unknown',
+    email: (payload.email as string) ?? fallbackEmail ?? 'unbekannt',
+  };
+};
+
+export const persistSession = (session: CognitoSession) => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+};
+
+export const clearSession = () => {
+  localStorage.removeItem(SESSION_KEY);
+};
+
+export const loadSession = (): CognitoSession | null => {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as CognitoSession;
+  } catch (error) {
+    console.error('Gespeicherte Session ungültig', error);
+    return null;
+  }
+};
+
+const createFormBody = (params: Record<string, string>) =>
+  Object.entries(params)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+
+const requestTokens = async (body: Record<string, string>) => {
+  const { domain } = getEnv();
+  const response = await fetch(`${domain}/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: createFormBody(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Cognito-Token konnten nicht abgerufen werden.');
+  }
+
+  const payload = (await response.json()) as {
+    id_token: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_in: number;
+  };
+
+  if (!payload.id_token || !payload.access_token) {
+    throw new Error('Cognito hat keine gültigen Tokens zurückgegeben.');
+  }
+
+  const expiresAt = Date.now() + payload.expires_in * 1000;
+
+  return {
+    session: {
+      idToken: payload.id_token,
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token ?? null,
+      expiresAt,
+    },
+    user: mapIdTokenToUser(payload.id_token),
+  };
+};
+
+export const exchangeCodeForSession = async (code: string, stateParam?: string) => {
+  const storedStateValue = sessionStorage.getItem(PKCE_STATE_KEY);
+  const storedState = storedStateValue ? decodeState(storedStateValue) : null;
+  const incomingState = stateParam ? decodeState(stateParam) : null;
+
+  if (!storedState || !storedState.codeVerifier) {
+    throw new Error('Es wurde kein PKCE-State gefunden. Starte den Login erneut.');
+  }
+
+  if (incomingState && incomingState.codeVerifier !== storedState.codeVerifier) {
+    throw new Error('Ungültiger OAuth-State erhalten.');
+  }
+
+  const { clientId, redirectUri } = getEnv();
+
+  const result = await requestTokens({
+    grant_type: 'authorization_code',
+    code,
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    code_verifier: storedState.codeVerifier,
+  });
+
+  persistSession(result.session);
+  clearPkceState();
+
+  return { ...result, redirectPath: storedState.redirectPath };
+};
+
+export const refreshWithToken = async (refreshToken: string) => {
+  const { clientId } = getEnv();
+  const result = await requestTokens({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    client_id: clientId,
+  });
+
+  persistSession(result.session);
+  return result;
+};
+
+export const resolveStoredUser = async (): Promise<AuthUser | null> => {
+  const session = loadSession();
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt > Date.now() + 60_000) {
+    return mapIdTokenToUser(session.idToken);
+  }
+
+  if (!session.refreshToken) {
+    clearSession();
+    return null;
+  }
+
+  try {
+    const refreshed = await refreshWithToken(session.refreshToken);
+    return refreshed.user;
+  } catch (error) {
+    console.error('Token-Refresh fehlgeschlagen', error);
+    clearSession();
+    return null;
+  }
+};
+
+export const buildLogoutUrl = () => {
+  const { domain, clientId, redirectUri } = getEnv();
+  const params = new URLSearchParams({
+    client_id: clientId,
+    logout_uri: redirectUri,
+  });
+  return `${domain}/logout?${params.toString()}`;
+};
