@@ -1,7 +1,7 @@
 import type { Activity, ActivityAttribute, DailyHighlight, LogAttributeValue, LogEntry } from '../types';
 
 const DEFAULT_API_BASE = 'https://v2thu7qsrd.execute-api.eu-central-1.amazonaws.com/dev';
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE).replace(/\/$/, '');
+export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE).replace(/\/$/, '');
 
 type RequestOptions = {
   path: string;

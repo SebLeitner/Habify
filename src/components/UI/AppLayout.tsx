@@ -8,6 +8,7 @@ const navItems = [
   { to: '/editor', label: 'Editor' },
   { to: '/highlights', label: 'Highlights' },
   { to: '/logs', label: 'Logbuch' },
+  { to: '/data', label: 'Daten' },
   { to: '/stats', label: 'Statistiken' },
 ];
 
