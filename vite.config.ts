@@ -1,6 +1,10 @@
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   plugins: [
@@ -81,5 +85,11 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        mobile: resolve(__dirname, 'mobile.html'),
+      },
+    },
   },
 });
