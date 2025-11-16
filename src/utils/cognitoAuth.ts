@@ -2,6 +2,7 @@ import { AuthUser } from '../types/auth';
 
 const SESSION_KEY = 'habify-cognito-session';
 const PKCE_STATE_KEY = 'habify-cognito-pkce-state';
+const DEBUG_FLAG = 'VITE_COGNITO_DEBUG';
 
 export type CognitoSession = {
   idToken: string;
@@ -28,6 +29,27 @@ const getEnv = () => {
   }
 
   return { domain, clientId, redirectUri };
+};
+
+const isDebugEnabled = () => `${import.meta.env[DEBUG_FLAG]}`.toLowerCase() === 'true';
+
+const maskToken = (token?: string | null) => {
+  if (!token) return token;
+  if (token.length <= 10) return token;
+  return `${token.slice(0, 6)}...${token.slice(-4)}`;
+};
+
+const debugLog = (title: string, payload: Record<string, unknown>) => {
+  if (!isDebugEnabled()) return;
+
+  // eslint-disable-next-line no-console
+  console.groupCollapsed(`[Cognito Debug] ${title}`);
+  Object.entries(payload).forEach(([key, value]) => {
+    // eslint-disable-next-line no-console
+    console.log(`${key}:`, value);
+  });
+  // eslint-disable-next-line no-console
+  console.groupEnd();
 };
 
 const encodeState = (state: AuthRedirectState) => btoa(JSON.stringify(state));
@@ -77,6 +99,18 @@ export const buildAuthorizeUrl = async (mode: 'login' | 'register', redirectPath
     params.append('screen_hint', 'signup');
   }
 
+  debugLog('Authorize-URL erstellt', {
+    mode,
+    domain,
+    clientId,
+    redirectUri,
+    redirectPath: redirectPath ?? 'none',
+    state,
+    codeChallenge,
+    authorizeUrl: `${domain}/oauth2/authorize`,
+    query: Object.fromEntries(params),
+  });
+
   return `${domain}/oauth2/authorize?${params.toString()}`;
 };
 
@@ -125,6 +159,14 @@ const createFormBody = (params: Record<string, string>) =>
 
 const requestTokens = async (body: Record<string, string>) => {
   const { domain } = getEnv();
+  debugLog('Token-Request gesendet', {
+    tokenEndpoint: `${domain}/oauth2/token`,
+    grant_type: body.grant_type,
+    redirect_uri: body.redirect_uri,
+    code_verifier: body.code_verifier,
+    code: body.code,
+    refresh_token: maskToken(body.refresh_token),
+  });
   const response = await fetch(`${domain}/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -186,6 +228,16 @@ export const exchangeCodeForSession = async (code: string, stateParam?: string) 
   });
 
   persistSession(result.session);
+  debugLog('Authorization Code eingelöst', {
+    redirectPath: storedState.redirectPath ?? 'none',
+    session: {
+      expiresAt: new Date(result.session.expiresAt).toISOString(),
+      accessToken: maskToken(result.session.accessToken),
+      refreshToken: maskToken(result.session.refreshToken),
+      idToken: maskToken(result.session.idToken),
+    },
+    user: result.user,
+  });
   clearPkceState();
 
   return { ...result, redirectPath: storedState.redirectPath };
@@ -197,6 +249,16 @@ export const refreshWithToken = async (refreshToken: string) => {
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
     client_id: clientId,
+  });
+
+  debugLog('Refresh Token eingelöst', {
+    session: {
+      expiresAt: new Date(result.session.expiresAt).toISOString(),
+      accessToken: maskToken(result.session.accessToken),
+      refreshToken: maskToken(result.session.refreshToken),
+      idToken: maskToken(result.session.idToken),
+    },
+    user: result.user,
   });
 
   persistSession(result.session);
@@ -226,7 +288,7 @@ export const resolveStoredUser = async (): Promise<AuthUser | null> => {
     clearSession();
     return null;
   }
-};
+}; 
 
 export const buildLogoutUrl = () => {
   const { domain, clientId, redirectUri } = getEnv();
@@ -234,5 +296,33 @@ export const buildLogoutUrl = () => {
     client_id: clientId,
     logout_uri: redirectUri,
   });
+  debugLog('Logout-URL erstellt', {
+    domain,
+    clientId,
+    logoutUri: redirectUri,
+    logoutUrl: `${domain}/logout`,
+    query: Object.fromEntries(params),
+  });
   return `${domain}/logout?${params.toString()}`;
+};
+
+export const logCognitoDebugInfo = () => {
+  const { domain, clientId, redirectUri } = getEnv();
+  const storedSession = loadSession();
+
+  debugLog('Aktuelle Cognito-Konfiguration', {
+    domain,
+    clientId,
+    redirectUri,
+    origin: window.location.origin,
+    hasStoredSession: Boolean(storedSession),
+    storedSession: storedSession
+      ? {
+          expiresAt: new Date(storedSession.expiresAt).toISOString(),
+          accessToken: maskToken(storedSession.accessToken),
+          refreshToken: maskToken(storedSession.refreshToken),
+          idToken: maskToken(storedSession.idToken),
+        }
+      : 'none',
+  });
 };

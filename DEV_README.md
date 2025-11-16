@@ -30,6 +30,9 @@ VITE_API_URL=<API_URL_AUS_TERRAFORM>
 VITE_COGNITO_DOMAIN=<COGNITO_DOMAIN_AUS_TERRAFORM>
 VITE_COGNITO_USER_POOL_CLIENT_ID=<CLIENT_ID_AUS_TERRAFORM>
 VITE_COGNITO_REDIRECT_URI=http://localhost:5173/login
+# Aktiviert detaillierte Cognito-Debug-Ausgaben in der Browser-Konsole
+# (Domain, Redirect-URL, Authorize-/Token-Requests usw.)
+VITE_COGNITO_DEBUG=true
 ```
 
 > Hinweis: `VITE_COGNITO_REDIRECT_URI` muss genau der Callback-URL entsprechen, die im User-Pool-Client hinterlegt ist (Terraform setzt standardmäßig `/login`).
@@ -60,3 +63,5 @@ npm run dev
 - Leere Login-Seite? Prüfe die .env-Werte und ob die Cognito-Domain erreichbar ist.
 - „PKCE-State“ Fehler: Logout ausführen und Login erneut starten, damit ein neuer Code-Verifier erzeugt wird.
 - Redirect-Loop: Sicherstellen, dass `VITE_COGNITO_REDIRECT_URI` exakt mit der Callback-URL im User-Pool-Client übereinstimmt.
+- Mehr Details sehen? Setze `VITE_COGNITO_DEBUG=true` und öffne die Browser-Konsole. Dort siehst du u. a. Domain, Callback-/Logout-URL,
+  Authorize-Query-Parameter, Token-Requests (ohne vollständige Tokens) und den aktuellen gespeicherten Session-Status.
