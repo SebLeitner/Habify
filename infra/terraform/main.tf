@@ -24,9 +24,11 @@ provider "aws" {
 locals {
   project_name    = "habify"
   app_domain_name = "${var.app_subdomain}.${var.root_domain}"
+  pwa_domain_name = "app.${local.app_domain_name}"
 
   callback_urls = distinct([
     "https://${local.app_domain_name}/login",
+    "https://${local.pwa_domain_name}/login",
     "http://localhost:5173/login",
     "http://127.0.0.1:5173/login",
     "http://localhost:4173/login",
@@ -34,6 +36,7 @@ locals {
 
   logout_urls = distinct([
     "https://${local.app_domain_name}/login",
+    "https://${local.pwa_domain_name}/login",
     "http://localhost:5173/login",
     "http://127.0.0.1:5173/login",
     "http://localhost:4173/login",
@@ -57,6 +60,9 @@ data "aws_route53_zone" "root" {
 resource "aws_acm_certificate" "app" {
   provider          = aws.us_east_1
   domain_name       = local.app_domain_name
+  subject_alternative_names = [
+    local.pwa_domain_name,
+  ]
   validation_method = "DNS"
 
   lifecycle {
@@ -131,7 +137,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
   comment             = "Habify Frontend"
   default_root_object = "index.html"
-  aliases             = [local.app_domain_name]
+  aliases             = [local.app_domain_name, local.pwa_domain_name]
 
   depends_on = [aws_acm_certificate_validation.app]
 
@@ -458,6 +464,18 @@ resource "aws_route53_record" "frontend" {
   }
 }
 
+resource "aws_route53_record" "pwa_frontend" {
+  zone_id = data.aws_route53_zone.root.zone_id
+  name    = local.pwa_domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.frontend.domain_name
+    zone_id                = aws_cloudfront_distribution.frontend.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
 output "cloudfront_url" {
   value = aws_cloudfront_distribution.frontend.domain_name
 }
@@ -468,6 +486,10 @@ output "api_url" {
 
 output "app_domain" {
   value = local.app_domain_name
+}
+
+output "pwa_app_domain" {
+  value = local.pwa_domain_name
 }
 
 output "cognito_user_pool_id" {

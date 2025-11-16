@@ -53,7 +53,7 @@ Im Verzeichnis `infra/terraform` befindet sich eine vollständige Terraform-Konf
 - Lambda-Funktion (Node.js 20) mit API-Gateway-HTTP-API (v2)
 - IAM-Rollen und Policies
 - CloudWatch-Log-Gruppen
-- Route-53-DNS-Einträge und ACM-Zertifikat für `habify.leitnersoft.com`
+- Route-53-DNS-Einträge und ACM-Zertifikat für `habify.leitnersoft.com` sowie die PWA unter `app.habify.leitnersoft.com`
 
 > **Hinweis:** Für das automatische DNS-Setup muss die Root-Domain (Standard: `leitnersoft.com`) bereits als öffentliche Hosted Zone in Route 53 existieren.
 
@@ -71,7 +71,7 @@ terraform apply \
   -var="app_subdomain=habify"
 ```
 
-Nach erfolgreicher Bereitstellung ist das Frontend automatisch unter `https://habify.leitnersoft.com` erreichbar (bzw. unter der angegebenen Domain). Terraform leitet die Cognito-Callback- und Logout-URLs automatisch aus dieser Domain ab. Die Outputs liefern zusätzlich `cloudfront_url` (CDN-URL), `api_url` (API-Basis), `app_domain` (konfigurierte Domain) sowie `cognito_user_pool_id` und `cognito_user_pool_client_id` für die Authentifizierung.
+Nach erfolgreicher Bereitstellung ist das Frontend automatisch unter `https://habify.leitnersoft.com` erreichbar (bzw. unter der angegebenen Domain). Parallel wird eine dedizierte PWA-Variante für mobile Nutzer unter `https://app.habify.leitnersoft.com` bereitgestellt. Terraform leitet die Cognito-Callback- und Logout-URLs automatisch aus beiden Domains ab. Die Outputs liefern zusätzlich `cloudfront_url` (CDN-URL), `api_url` (API-Basis), `app_domain` (konfigurierte Domain), `pwa_app_domain` (PWA-Subdomain) sowie `cognito_user_pool_id` und `cognito_user_pool_client_id` für die Authentifizierung.
 
 ## Tests
 
