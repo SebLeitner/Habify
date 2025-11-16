@@ -173,8 +173,8 @@ const MobileCapturePage = () => {
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-white">Logbuch-Eintrag</h2>
-            <p className="text-xs text-slate-400">Datum/Uhrzeit optional, sonst jetzt.</p>
+            <h2 className="text-base font-semibold text-white">Details festhalten</h2>
+            <p className="text-xs text-slate-400">Datum/Uhrzeit optional, sonst wird jetzt gespeichert.</p>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-300">
             <input
