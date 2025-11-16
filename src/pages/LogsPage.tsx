@@ -1,5 +1,16 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { addDays, endOfDay, format, isAfter, isSameDay, startOfDay } from 'date-fns';
+import {
+  addDays,
+  eachDayOfInterval,
+  endOfDay,
+  endOfWeek,
+  format,
+  isAfter,
+  isSameDay,
+  isWithinInterval,
+  startOfDay,
+  startOfWeek,
+} from 'date-fns';
 import { de } from 'date-fns/locale';
 import LogList from '../components/Log/LogList';
 import Button from '../components/UI/Button';
@@ -9,6 +20,134 @@ import { type DailyHighlight, LogEntry, useData } from '../contexts/DataContext'
 import { formatDateForDisplay, parseDisplayDateToISO } from '../utils/datetime';
 import { isFirefox } from '../utils/browser';
 
+const PDF_LINE_HEIGHT = 16;
+const PDF_MARGIN = 50;
+
+const wrapText = (text: string, maxChars = 90) => {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = '';
+
+  words.forEach((word) => {
+    if ((currentLine + word).length <= maxChars) {
+      currentLine = currentLine ? `${currentLine} ${word}` : word;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word;
+    }
+  });
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+};
+
+const escapePdfText = (text: string) => {
+  return Array.from(text)
+    .map((char) => {
+      if (char === '\\') return '\\\\';
+      if (char === '(') return '\\(';
+      if (char === ')') return '\\)';
+      if (char === '\n' || char === '\r') return ' ';
+      if (char.charCodeAt(0) > 0xff) return '?';
+      return char;
+    })
+    .join('');
+};
+
+const buildPdfPages = (lines: string[]) => {
+  const maxLinesPerPage = Math.floor((842 - PDF_MARGIN * 2) / PDF_LINE_HEIGHT) - 1;
+  const pages: string[][] = [];
+  let current: string[] = [];
+
+  lines.forEach((line) => {
+    if (current.length >= maxLinesPerPage) {
+      pages.push(current);
+      current = [];
+    }
+    current.push(line);
+  });
+
+  if (current.length) {
+    pages.push(current);
+  }
+
+  return pages;
+};
+
+const createPdfContentStream = (lines: string[]) => {
+  const escapedLines = lines.map((line) => escapePdfText(line));
+  const streamBody = escapedLines
+    .map((line, index) => `${index === 0 ? '' : 'T* '}${line ? `(${line}) Tj` : '() Tj'}`)
+    .join('\n');
+  return `BT\n/F1 12 Tf\n${PDF_MARGIN} ${842 - PDF_MARGIN} Td\n${PDF_LINE_HEIGHT} TL\n${streamBody}\nET`;
+};
+
+const generatePdf = (pages: string[][]) => {
+  const objects: string[] = [];
+  const addObject = (content: string) => {
+    objects.push(content);
+    return objects.length; // object id
+  };
+
+  const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const contentIds = pages.map((pageLines) => {
+    const stream = createPdfContentStream(pageLines);
+    const length = stream.length;
+    return addObject(`<< /Length ${length} >>\nstream\n${stream}\nendstream`);
+  });
+
+  const pagesId = addObject(''); // placeholder
+
+  const pageIds = pages.map((_, index) => {
+    const pageObj = `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Contents ${
+      contentIds[index]
+    } 0 R /Resources << /Font << /F1 ${fontId} 0 R >> >> >>`;
+    return addObject(pageObj);
+  });
+
+  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds
+    .map((id) => `${id} 0 R`)
+    .join(' ')}] /Count ${pageIds.length} >>`;
+
+  const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+  let pdf = '%PDF-1.4\n';
+  const offsets: number[] = [0];
+
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+
+  const xrefStart = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${offset.toString().padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+
+  return pdf;
+};
+
+const downloadPdf = (filename: string, pages: string[][]) => {
+  const pdfString = generatePdf(pages);
+  const blob = new Blob([pdfString], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 const LogsPage = () => {
   const { state, deleteLog, deleteHighlight, isLoading, error } = useData();
   const firefox = isFirefox();
@@ -17,6 +156,18 @@ const LogsPage = () => {
     firefox ? formatDateForDisplay(format(startOfDay(new Date()), 'yyyy-MM-dd')) : '',
   );
   const [highlightError, setHighlightError] = useState<string | null>(null);
+  const [exportStart, setExportStart] = useState(() =>
+    format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+  );
+  const [exportEnd, setExportEnd] = useState(() =>
+    format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+  );
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const activityLookup = useMemo(() => {
+    return new Map(state.activities.map((activity) => [activity.id, activity]));
+  }, [state.activities]);
 
   useEffect(() => {
     if (!firefox) {
@@ -102,6 +253,150 @@ const LogsPage = () => {
     }
   };
 
+  const buildDailyLines = (startDate: Date, endDate: Date) => {
+    const dayLines: string[] = [];
+    const dayList = eachDayOfInterval({ start: startDate, end: endDate });
+    const logsInRange = state.logs
+      .filter((log) =>
+        isWithinInterval(new Date(log.timestamp), {
+          start: startOfDay(startDate),
+          end: endOfDay(endDate),
+        }),
+      )
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const highlightsInRange = state.highlights.filter((highlight) => {
+      const date = new Date(highlight.date);
+      return isWithinInterval(date, { start: startOfDay(startDate), end: endOfDay(endDate) });
+    });
+
+    if (!logsInRange.length && !highlightsInRange.length) {
+      return ['Keine Einträge im gewählten Zeitraum.'];
+    }
+
+    dayList.forEach((day) => {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const dayLogs = logsInRange.filter((log) => format(new Date(log.timestamp), 'yyyy-MM-dd') === dateKey);
+      const dayHighlights = highlightsInRange.filter((highlight) => highlight.date === dateKey);
+
+      if (!dayLogs.length && !dayHighlights.length) {
+        return;
+      }
+
+      dayLines.push(`${format(day, 'EEEE, dd.MM.yyyy', { locale: de })}`);
+
+      if (dayHighlights.length) {
+        dayLines.push('  Highlights:');
+        dayHighlights.forEach((highlight) => {
+          dayLines.push(...wrapText(`- ${highlight.title}: ${highlight.text}`, 100));
+        });
+      }
+
+      if (dayLogs.length) {
+        dayLines.push('  Aktivitäten:');
+        dayLogs.forEach((log) => {
+          const activity = activityLookup.get(log.activityId);
+          const timeLabel = format(new Date(log.timestamp), 'HH:mm');
+          const baseLine = `${timeLabel} • ${activity?.name ?? 'Aktivität'}${
+            log.note ? ` - ${log.note}` : ''
+          }`;
+          wrapText(baseLine, 100).forEach((line, index) => {
+            dayLines.push(index === 0 ? `- ${line}` : `  ${line}`);
+          });
+        });
+      }
+
+      dayLines.push('');
+    });
+
+    return dayLines;
+  };
+
+  const buildWeeklyStats = (startDate: Date, endDate: Date) => {
+    const statsLines: string[] = [];
+    const logsInRange = state.logs.filter((log) =>
+      isWithinInterval(new Date(log.timestamp), {
+        start: startOfDay(startDate),
+        end: endOfDay(endDate),
+      }),
+    );
+
+    if (!logsInRange.length) {
+      return statsLines;
+    }
+
+    const weekBuckets = new Map<string, Map<string, number>>();
+
+    logsInRange.forEach((log) => {
+      const weekStart = startOfWeek(new Date(log.timestamp), { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(new Date(log.timestamp), { weekStartsOn: 1 });
+      const weekKey = `${format(weekStart, 'yyyy-MM-dd')}__${format(weekEnd, 'yyyy-MM-dd')}`;
+      if (!weekBuckets.has(weekKey)) {
+        weekBuckets.set(weekKey, new Map());
+      }
+      const weekMap = weekBuckets.get(weekKey)!;
+      weekMap.set(log.activityId, (weekMap.get(log.activityId) ?? 0) + 1);
+    });
+
+    statsLines.push('Wöchentliche Statistiken');
+    Array.from(weekBuckets.entries())
+      .sort((a, b) => (a[0] > b[0] ? 1 : -1))
+      .forEach(([key, counts]) => {
+        const [startKey, endKey] = key.split('__');
+        statsLines.push(
+          `${format(new Date(startKey), 'dd.MM.yyyy')} – ${format(new Date(endKey), 'dd.MM.yyyy')}`,
+        );
+        counts.forEach((count, activityId) => {
+          const activity = activityLookup.get(activityId);
+          statsLines.push(`- ${activity?.name ?? 'Aktivität'}: ${count}x`);
+        });
+        statsLines.push('');
+      });
+
+    return statsLines;
+  };
+
+  const handleExport = () => {
+    setExportError(null);
+    const parsedStart = startOfDay(new Date(exportStart));
+    const parsedEnd = endOfDay(new Date(exportEnd));
+
+    if (Number.isNaN(parsedStart.getTime()) || Number.isNaN(parsedEnd.getTime())) {
+      setExportError('Bitte gib ein gültiges Start- und Enddatum an.');
+      return;
+    }
+
+    if (parsedStart > parsedEnd) {
+      setExportError('Das Startdatum darf nicht nach dem Enddatum liegen.');
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const lines: string[] = [];
+      lines.push('Logbuch Export');
+      lines.push(
+        `Zeitraum: ${format(parsedStart, 'dd.MM.yyyy')} – ${format(parsedEnd, 'dd.MM.yyyy')}`,
+      );
+      lines.push('');
+
+      lines.push(...buildDailyLines(parsedStart, parsedEnd));
+
+      const weeklyLines = buildWeeklyStats(parsedStart, parsedEnd);
+      if (weeklyLines.length) {
+        lines.push('', ...weeklyLines);
+      }
+
+      const pages = buildPdfPages(lines);
+      downloadPdf(`logbuch-${exportStart}-bis-${exportEnd}.pdf`, pages.length ? pages : [['Keine Daten']]);
+    } catch (pdfError) {
+      const message = pdfError instanceof Error ? pdfError.message : 'PDF konnte nicht erstellt werden.';
+      setExportError(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -149,6 +444,40 @@ const LogsPage = () => {
           </label>
         </div>
       </header>
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Logbuch exportieren</h2>
+            <p className="text-sm text-slate-400">
+              Wähle einen Zeitraum, um Highlights, Aktivitäten und wöchentliche Statistiken als PDF zu speichern.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 text-sm text-slate-300 md:flex-row md:items-end md:gap-4">
+            <label className="flex flex-col gap-2">
+              <span className="text-xs uppercase tracking-wide text-slate-400">Startdatum</span>
+              <input
+                type="date"
+                value={exportStart}
+                onChange={(event) => setExportStart(event.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
+              />
+            </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-xs uppercase tracking-wide text-slate-400">Enddatum</span>
+              <input
+                type="date"
+                value={exportEnd}
+                onChange={(event) => setExportEnd(event.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
+              />
+            </label>
+            <Button onClick={handleExport} disabled={isExporting}>
+              {isExporting ? 'PDF wird erstellt…' : 'PDF erstellen'}
+            </Button>
+          </div>
+        </div>
+        {exportError && <p className="pt-3 text-sm text-red-400">{exportError}</p>}
+      </section>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <DailyHighlights
         highlights={highlightsForSelectedDate}
