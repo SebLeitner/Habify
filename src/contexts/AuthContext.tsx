@@ -1,72 +1,85 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-
-export type AuthUser = {
-  id: string;
-  email: string;
-};
+import {
+  buildAuthorizeUrl,
+  buildLogoutUrl,
+  clearSession,
+  exchangeCodeForSession,
+  resolveStoredUser,
+} from '../utils/cognitoAuth';
+import { AuthUser } from '../types/auth';
 
 type AuthContextValue = {
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  login: (redirectPath?: string) => Promise<void>;
+  register: (redirectPath?: string) => Promise<void>;
+  completeLogin: (code: string, state?: string) => Promise<string | undefined>;
+  logout: () => Promise<void>;
   isLoading: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-const STORAGE_KEY = 'habify-auth-user';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const cached = localStorage.getItem(STORAGE_KEY);
-    if (cached) {
-      setUser(JSON.parse(cached));
-    }
-    setIsLoading(false);
+    const loadUser = async () => {
+      try {
+        const currentUser = await resolveStoredUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Benutzer konnte nicht geladen werden', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadUser();
   }, []);
 
-  const persistUser = useCallback((authUser: AuthUser | null) => {
-    if (authUser) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+  const startFlow = useCallback(async (mode: 'login' | 'register', redirectPath?: string) => {
+    const url = await buildAuthorizeUrl(mode, redirectPath);
+    window.location.assign(url);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    if (!email || !password) {
-      throw new Error('Bitte E-Mail und Passwort angeben.');
-    }
-    const fakeUser: AuthUser = { id: btoa(email).slice(0, 12), email };
-    persistUser(fakeUser);
-    setUser(fakeUser);
-  }, [persistUser]);
+  const login = useCallback(async (redirectPath?: string) => startFlow('login', redirectPath), [startFlow]);
 
   const register = useCallback(
-    async (email: string, password: string) => {
-      await login(email, password);
+    async (redirectPath?: string) => {
+      await startFlow('register', redirectPath);
     },
-    [login],
+    [startFlow],
   );
 
-  const logout = useCallback(() => {
-    persistUser(null);
+  const completeLogin = useCallback(async (code: string, state?: string) => {
+    const { user: authenticatedUser, redirectPath } = await exchangeCodeForSession(code, state);
+    setUser(authenticatedUser);
+    return redirectPath;
+  }, []);
+
+  const logout = useCallback(async () => {
+    clearSession();
     setUser(null);
-  }, [persistUser]);
+    try {
+      const logoutUrl = buildLogoutUrl();
+      window.location.assign(logoutUrl);
+    } catch (error) {
+      console.error('Logout-Redirect fehlgeschlagen', error);
+    }
+  }, []);
 
   const value = useMemo(
     () => ({
       user,
       login,
       register,
+      completeLogin,
       logout,
       isLoading,
     }),
-    [user, login, register, logout, isLoading],
+    [user, login, register, completeLogin, logout, isLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

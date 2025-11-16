@@ -351,6 +351,11 @@ resource "aws_cognito_user_pool_client" "habify" {
   supported_identity_providers         = ["COGNITO"]
 }
 
+resource "aws_cognito_user_pool_domain" "habify" {
+  domain       = "${local.project_name}-${var.environment}"
+  user_pool_id = aws_cognito_user_pool.habify.id
+}
+
 resource "aws_apigatewayv2_api" "habify" {
   name          = "${local.project_name}-${var.environment}-api"
   protocol_type = "HTTP"
@@ -458,4 +463,8 @@ output "cognito_user_pool_id" {
 
 output "cognito_user_pool_client_id" {
   value = aws_cognito_user_pool_client.habify.id
+}
+
+output "cognito_domain" {
+  value = "https://${aws_cognito_user_pool_domain.habify.domain}.auth.${var.aws_region}.amazoncognito.com"
 }
