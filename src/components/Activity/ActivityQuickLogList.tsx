@@ -59,6 +59,20 @@ const ActivityCard = ({
     setDrafts(emptyDrafts(activity.attributes));
   }, [activity.id, activity.attributes, attributeSignature]);
 
+  const resetForm = () => {
+    const resetDate = currentLocalDate();
+    const resetTime = currentLocalTime();
+    setDate(resetDate);
+    setTime(resetTime);
+    if (firefox) {
+      setFirefoxDateInput(formatDateForDisplay(resetDate));
+      setFirefoxTimeInput(resetTime);
+    }
+    setDrafts(emptyDrafts(activity.attributes));
+    setNote('');
+    setError(null);
+  };
+
   const accentColor = `${activity.color}33`;
 
   const toggle = () => {
@@ -117,18 +131,8 @@ const ActivityCard = ({
         note: note.trim() ? note.trim() : undefined,
         attributes: attributeValues.length ? attributeValues : undefined,
       });
-      setNote('');
-      const resetDate = currentLocalDate();
-      const resetTime = currentLocalTime();
-      setDate(resetDate);
-      setTime(resetTime);
-      if (firefox) {
-        setFirefoxDateInput(formatDateForDisplay(resetDate));
-        setFirefoxTimeInput(resetTime);
-      }
-      setDrafts(emptyDrafts(activity.attributes));
+      resetForm();
       setIsExpanded(false);
-      setError(null);
     } catch (submitError) {
       console.error('Log konnte nicht gespeichert werden', submitError);
       setError(
@@ -226,12 +230,22 @@ const ActivityCard = ({
               placeholder="Optional"
               className="min-h-[80px]"
             />
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  resetForm();
+                  setIsExpanded(false);
+                }}
+              >
+                Markierung entfernen
+              </Button>
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? 'Speichern …' : 'Speichern'}
               </Button>
             </div>
+            {error && <p className="text-sm text-red-400">{error}</p>}
           </form>
         </div>
       )}
