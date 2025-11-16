@@ -1,18 +1,47 @@
-import { FormEvent, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/UI/Button';
-import Input from '../components/UI/Input';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage = () => {
-  const { login, register } = useAuth();
+  const { login, register, completeLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const redirectPath = (location.state as { from?: string } | null)?.from;
+
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const errorDescription = searchParams.get('error_description') ?? searchParams.get('error');
+
+    if (errorDescription) {
+      setError(errorDescription);
+    }
+
+    if (!code) {
+      return;
+    }
+
+    const handleCallback = async () => {
+      setIsSubmitting(true);
+      setError(null);
+      try {
+        const redirect = await completeLogin(code, state ?? undefined);
+        navigate(redirect ?? redirectPath ?? '/activities', { replace: true });
+      } catch (callbackError) {
+        setError(callbackError instanceof Error ? callbackError.message : 'Login konnte nicht abgeschlossen werden.');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    void handleCallback();
+  }, [searchParams, completeLogin, navigate, redirectPath]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -20,15 +49,12 @@ const LoginPage = () => {
     setIsSubmitting(true);
     try {
       if (mode === 'login') {
-        await login(email, password);
+        await login(redirectPath);
       } else {
-        await register(email, password);
+        await register(redirectPath);
       }
-      const redirect = (location.state as { from?: string } | null)?.from ?? '/activities';
-      navigate(redirect, { replace: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Unbekannter Fehler');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -37,28 +63,12 @@ const LoginPage = () => {
     <div className="mx-auto max-w-md rounded-xl border border-slate-800 bg-slate-900/70 p-8 shadow-xl shadow-black/40">
       <h1 className="text-2xl font-bold text-white">{mode === 'login' ? 'Einloggen' : 'Registrieren'}</h1>
       <p className="mt-2 text-sm text-slate-400">
-        Nutze deine E-Mail-Adresse, um dich bei Habify anzumelden.
+        Du wirst zum Cognito-Hosted-UI weitergeleitet. Nach erfolgreicher Anmeldung geht es automatisch zurück zur App.
       </p>
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-        <Input
-          label="E-Mail"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
-        <Input
-          label="Passwort"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-        />
         {error && <div className="rounded-lg border border-red-500/60 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
         <Button type="submit" disabled={isSubmitting} className="w-full">
-          {isSubmitting ? 'Bitte warten…' : mode === 'login' ? 'Einloggen' : 'Konto erstellen'}
+          {isSubmitting ? 'Bitte warten…' : mode === 'login' ? 'Mit Cognito anmelden' : 'Cognito-Konto erstellen'}
         </Button>
       </form>
       <div className="mt-6 text-sm text-slate-300">
