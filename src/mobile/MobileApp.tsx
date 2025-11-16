@@ -4,6 +4,7 @@ import ProtectedRoute from '../components/UI/ProtectedRoute';
 import MobileLayout from './components/MobileLayout';
 import MobileCapturePage from './pages/MobileCapturePage';
 import MobileLogPage from './pages/MobileLogPage';
+import MobileHighlightsPage from './pages/MobileHighlightsPage';
 
 const MobileApp = () => {
   const location = useLocation();
@@ -26,6 +27,14 @@ const MobileApp = () => {
           element={(
             <ProtectedRoute>
               <MobileLogPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/highlights"
+          element={(
+            <ProtectedRoute>
+              <MobileHighlightsPage />
             </ProtectedRoute>
           )}
         />

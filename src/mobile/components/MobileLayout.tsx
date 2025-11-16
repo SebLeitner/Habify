@@ -6,6 +6,7 @@ import Button from '../../components/UI/Button';
 const navItems = [
   { to: '/capture', label: 'Aktivität eingeben' },
   { to: '/log', label: 'Logbuch ansehen' },
+  { to: '/highlights', label: 'Highlight hinzufügen' },
 ];
 
 const MobileLayout = ({ children, hideNavigation = false }: { children: ReactNode; hideNavigation?: boolean }) => {
