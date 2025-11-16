@@ -7,6 +7,7 @@ import StatsPage from './pages/StatsPage';
 import LoginPage from './pages/LoginPage';
 import AppLayout from './components/UI/AppLayout';
 import ProtectedRoute from './components/UI/ProtectedRoute';
+import DataOverviewPage from './pages/DataOverviewPage';
 
 const App = () => {
   return (
@@ -34,6 +35,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <LogsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/data"
+          element={
+            <ProtectedRoute>
+              <DataOverviewPage />
             </ProtectedRoute>
           }
         />
