@@ -170,6 +170,28 @@ const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
   text: (highlight.text ?? '').toString(),
 });
 
+export const checkBackendHealth = async (timeoutMs = 5000): Promise<boolean> => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+
+    return response.ok || response.status >= 400;
+  } catch (error) {
+    if ((error as Error).name !== 'AbortError') {
+      console.error('Health-Check fehlgeschlagen', error);
+    }
+    return false;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
+
 const extractActivities = (payload: ActivitiesListResponse): Activity[] => {
   if (Array.isArray(payload)) {
     return payload.map(normalizeActivity);

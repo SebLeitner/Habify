@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import Button from '../../components/UI/Button';
-import Spinner from '../../components/UI/Spinner';
 import TextArea from '../../components/UI/TextArea';
 import { useData } from '../../contexts/DataContext';
 import { currentLocalDate } from '../../utils/datetime';
@@ -13,9 +12,11 @@ const MobileHighlightsPage = () => {
   const [status, setStatus] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const { highlights } = state;
+
   const groupedHighlights = useMemo(() => {
-    const buckets = new Map<string, typeof state.highlights>();
-    state.highlights.forEach((highlight) => {
+    const buckets = new Map<string, typeof highlights>();
+    highlights.forEach((highlight) => {
       const key = highlight.date ?? currentLocalDate();
       const bucket = buckets.get(key) ?? [];
       bucket.push(highlight);
@@ -28,7 +29,7 @@ const MobileHighlightsPage = () => {
         items: items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
       }))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [state.highlights]);
+  }, [highlights]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

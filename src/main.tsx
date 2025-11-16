@@ -6,15 +6,18 @@ import './styles/index.css';
 import { DataProvider } from './contexts/DataContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { registerSW } from 'virtual:pwa-register';
+import { ConnectivityProvider } from './contexts/ConnectivityContext';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <DataProvider>
-          <App />
-        </DataProvider>
-      </AuthProvider>
+      <ConnectivityProvider>
+        <AuthProvider>
+          <DataProvider>
+            <App />
+          </DataProvider>
+        </AuthProvider>
+      </ConnectivityProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

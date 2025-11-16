@@ -15,7 +15,7 @@ export default defineConfig({
         name: 'Habify',
         short_name: 'Habify',
         description: 'Behalte deine Gewohnheiten mit Habify im Blick.',
-        start_url: '/',
+        start_url: '/mobile.html',
         scope: '/',
         display: 'standalone',
         background_color: '#0f172a',
@@ -47,7 +47,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: '/',
+        navigateFallback: '/mobile.html',
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {

@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/UI/Button';
+import { useConnectivity } from '../../contexts/ConnectivityContext';
+import ConnectivityNotice from './ConnectivityNotice';
 
 const navItems = [
   { to: '/capture', label: 'Aktivität eingeben' },
@@ -11,6 +13,8 @@ const navItems = [
 
 const MobileLayout = ({ children, hideNavigation = false }: { children: ReactNode; hideNavigation?: boolean }) => {
   const { user, logout } = useAuth();
+  const { status } = useConnectivity();
+  const isBlocked = status !== 'connected';
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
@@ -32,7 +36,10 @@ const MobileLayout = ({ children, hideNavigation = false }: { children: ReactNod
       </header>
 
       <main className="flex-1 px-4 py-4">
-        <div className="mx-auto w-full max-w-xl space-y-4">{children}</div>
+        <div className="mx-auto w-full max-w-xl space-y-4">
+          <ConnectivityNotice />
+          <div className={isBlocked ? 'pointer-events-none select-none opacity-60' : ''}>{children}</div>
+        </div>
       </main>
 
       {!hideNavigation && user && (
@@ -42,10 +49,16 @@ const MobileLayout = ({ children, hideNavigation = false }: { children: ReactNod
               <NavLink
                 key={item.to}
                 to={item.to}
+                aria-disabled={isBlocked}
+                tabIndex={isBlocked ? -1 : 0}
                 className={({ isActive }) =>
                   [
                     'flex-1 rounded-full px-4 py-2 text-center text-xs font-semibold transition',
-                    isActive ? 'bg-brand-primary/30 text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700',
+                    isBlocked
+                      ? 'cursor-not-allowed bg-slate-800/60 text-slate-400'
+                      : isActive
+                        ? 'bg-brand-primary/30 text-white'
+                        : 'bg-slate-800 text-slate-200 hover:bg-slate-700',
                   ].join(' ')
                 }
               >

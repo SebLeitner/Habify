@@ -5,16 +5,19 @@ import { registerSW } from 'virtual:pwa-register';
 import './styles/index.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
+import { ConnectivityProvider } from './contexts/ConnectivityContext';
 import MobileApp from './mobile/MobileApp';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <DataProvider>
-          <MobileApp />
-        </DataProvider>
-      </AuthProvider>
+      <ConnectivityProvider>
+        <AuthProvider>
+          <DataProvider>
+            <MobileApp />
+          </DataProvider>
+        </AuthProvider>
+      </ConnectivityProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );
