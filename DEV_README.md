@@ -19,6 +19,7 @@ Diese Anleitung beschreibt die Schritte, um die Cognito-Authentifizierung lokal 
    - `api_url`: Basis-URL der API (für `VITE_API_URL`).
    - `cognito_user_pool_client_id`: Client-ID des SPA.
    - `cognito_domain`: Hosted-UI-Domain (z. B. `https://habify-dev.auth.eu-central-1.amazoncognito.com`).
+   - `pwa_app_domain`: Mobile/PWA-Subdomain (standardmäßig `app.habify.leitnersoft.com`).
    - Callback-/Logout-URLs: Terraform hinterlegt automatisch die App-Domain **und** lokale URLs
      (`http://localhost:5173/login`, `http://127.0.0.1:5173/login`, `http://localhost:4173/login`).
 
