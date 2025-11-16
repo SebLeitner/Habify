@@ -19,6 +19,8 @@ Diese Anleitung beschreibt die Schritte, um die Cognito-Authentifizierung lokal 
    - `api_url`: Basis-URL der API (für `VITE_API_URL`).
    - `cognito_user_pool_client_id`: Client-ID des SPA.
    - `cognito_domain`: Hosted-UI-Domain (z. B. `https://habify-dev.auth.eu-central-1.amazoncognito.com`).
+   - Callback-/Logout-URLs: Terraform hinterlegt automatisch die App-Domain **und** lokale URLs
+     (`http://localhost:5173/login`, `http://127.0.0.1:5173/login`, `http://localhost:4173/login`).
 
 ## 2. Lokale Umgebungsvariablen setzen
 Lege eine `.env.local` im Projektwurzelverzeichnis an und befülle sie mit den Cognito- und API-Daten:
@@ -31,6 +33,12 @@ VITE_COGNITO_REDIRECT_URI=http://localhost:5173/login
 ```
 
 > Hinweis: `VITE_COGNITO_REDIRECT_URI` muss genau der Callback-URL entsprechen, die im User-Pool-Client hinterlegt ist (Terraform setzt standardmäßig `/login`).
+
+Typische Fehlermeldung bei nicht erlaubter Redirect-URL:
+```
+https://<cognito-domain>/error?error=redirect_mismatch&client_id=<client-id>
+```
+Stelle in diesem Fall sicher, dass deine laufende URL (z. B. `http://localhost:5173/login` oder die CloudFront-Domain) in den User-Pool-Client-Callback-URLs steht. Ein erneutes `terraform apply` aktualisiert die Liste gemäß den oben genannten Werten.
 
 ## 3. Entwicklungsserver starten
 ```bash
