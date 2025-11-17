@@ -11,7 +11,7 @@ export default defineConfig({
         name: 'Habify',
         short_name: 'Habify',
         description: 'Behalte deine Gewohnheiten mit Habify im Blick.',
-        start_url: '/',
+        start_url: '/pwa',
         scope: '/',
         display: 'standalone',
         background_color: '#0f172a',

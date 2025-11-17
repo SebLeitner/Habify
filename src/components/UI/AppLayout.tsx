@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from './Button';
 
@@ -12,9 +12,10 @@ const navItems = [
   { to: '/stats', label: 'Statistiken' },
 ];
 
-const AppLayout = ({ children }: { children: ReactNode }) => {
+const AppLayout = ({ children }: { children?: ReactNode }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const content = children ?? <Outlet />;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -62,7 +63,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6 shadow-xl shadow-black/30">
-          {children}
+          {content}
         </div>
       </main>
     </div>

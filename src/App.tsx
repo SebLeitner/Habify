@@ -8,11 +8,15 @@ import LoginPage from './pages/LoginPage';
 import AppLayout from './components/UI/AppLayout';
 import ProtectedRoute from './components/UI/ProtectedRoute';
 import DataOverviewPage from './pages/DataOverviewPage';
+import PwaLayout from './components/Pwa/PwaLayout';
+import PwaActivitiesPage from './pages/pwa/PwaActivitiesPage';
+import PwaHighlightsPage from './pages/pwa/PwaHighlightsPage';
+import PwaLogPage from './pages/pwa/PwaLogPage';
 
 const App = () => {
   return (
-    <AppLayout>
-      <Routes>
+    <Routes>
+      <Route element={<AppLayout />}>
         <Route path="/" element={<Navigate to="/activities" replace />} />
         <Route
           path="/activities"
@@ -63,9 +67,22 @@ const App = () => {
           }
         />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/activities" replace />} />
-      </Routes>
-    </AppLayout>
+      </Route>
+      <Route
+        path="/pwa"
+        element={
+          <ProtectedRoute>
+            <PwaLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="activities" replace />} />
+        <Route path="activities" element={<PwaActivitiesPage />} />
+        <Route path="highlights" element={<PwaHighlightsPage />} />
+        <Route path="log" element={<PwaLogPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/activities" replace />} />
+    </Routes>
   );
 };
 
