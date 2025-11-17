@@ -260,6 +260,22 @@ resource "aws_dynamodb_table" "highlights" {
   }
 }
 
+resource "aws_dynamodb_table" "training_times" {
+  name         = "${local.project_name}-${var.environment}-training-times"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  tags = {
+    Project     = local.project_name
+    Environment = var.environment
+  }
+}
+
 resource "aws_iam_role" "lambda" {
   name = "${local.project_name}-${var.environment}-lambda-role"
 
@@ -303,6 +319,7 @@ resource "aws_iam_role_policy" "lambda_dynamo" {
           aws_dynamodb_table.logs.arn,
           "${aws_dynamodb_table.logs.arn}/index/activityId-index",
           aws_dynamodb_table.highlights.arn,
+          aws_dynamodb_table.training_times.arn,
         ]
       }
     ]
@@ -323,6 +340,7 @@ resource "aws_lambda_function" "api" {
       ACTIVITIES_TABLE = aws_dynamodb_table.activities.name
       LOGS_TABLE       = aws_dynamodb_table.logs.name
       HIGHLIGHTS_TABLE = aws_dynamodb_table.highlights.name
+      TRAINING_TIMES_TABLE = aws_dynamodb_table.training_times.name
     }
   }
 }

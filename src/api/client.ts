@@ -1,4 +1,11 @@
-import type { Activity, ActivityAttribute, DailyHighlight, LogAttributeValue, LogEntry } from '../types';
+import type {
+  Activity,
+  ActivityAttribute,
+  DailyHighlight,
+  LogAttributeValue,
+  LogEntry,
+  TrainingDiaryEntry,
+} from '../types';
 
 const DEFAULT_API_BASE = 'https://v2thu7qsrd.execute-api.eu-central-1.amazonaws.com/dev';
 export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? DEFAULT_API_BASE).replace(/\/$/, '');
@@ -14,9 +21,12 @@ type LogsListResponse = { items: LogEntry[] } | LogEntry[];
 type LogResponse = { item: LogEntry } | LogEntry;
 type HighlightsListResponse = { items: DailyHighlight[] } | DailyHighlight[];
 type HighlightResponse = { item: DailyHighlight } | DailyHighlight;
+type TrainingDiaryListResponse = { items: TrainingDiaryEntry[] } | TrainingDiaryEntry[];
+type TrainingDiaryResponse = { item: TrainingDiaryEntry } | TrainingDiaryEntry;
 
 type ListLogsParams = { userId?: string };
 type ListHighlightsParams = { userId?: string; date?: string };
+type ListTrainingTimesParams = { userId?: string };
 
 type UpdateActivityPayload = Partial<Omit<Activity, 'createdAt' | 'updatedAt'>> & { id: string };
 
@@ -25,6 +35,7 @@ type UpdateLogPayload = Partial<LogEntry> & { id: string; userId: string };
 type CreateLogPayload = Omit<LogEntry, 'id'> & { id?: string };
 type UpdateHighlightPayload = Partial<DailyHighlight> & { id: string; userId: string };
 type CreateHighlightPayload = Omit<DailyHighlight, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+type AddTrainingDurationPayload = { userId: string; date: string; minutes: number };
 
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -170,6 +181,11 @@ const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
   text: (highlight.text ?? '').toString(),
 });
 
+const normalizeTrainingDiaryEntry = (entry: TrainingDiaryEntry): TrainingDiaryEntry => ({
+  ...entry,
+  totalMinutes: Number(entry.totalMinutes) || 0,
+});
+
 const extractActivities = (payload: ActivitiesListResponse): Activity[] => {
   if (Array.isArray(payload)) {
     return payload.map(normalizeActivity);
@@ -228,6 +244,26 @@ const extractHighlight = (payload: HighlightResponse): DailyHighlight => {
   }
 
   return normalizeHighlight(payload as DailyHighlight);
+};
+
+const extractTrainingTimes = (payload: TrainingDiaryListResponse): TrainingDiaryEntry[] => {
+  if (Array.isArray(payload)) {
+    return payload.map(normalizeTrainingDiaryEntry);
+  }
+
+  if ('items' in payload && Array.isArray(payload.items)) {
+    return payload.items.map(normalizeTrainingDiaryEntry);
+  }
+
+  return [];
+};
+
+const extractTrainingTime = (payload: TrainingDiaryResponse): TrainingDiaryEntry => {
+  if ('item' in payload && payload.item) {
+    return normalizeTrainingDiaryEntry(payload.item);
+  }
+
+  return normalizeTrainingDiaryEntry(payload as TrainingDiaryEntry);
 };
 
 export const listActivities = async (): Promise<Activity[]> => {
@@ -290,4 +326,22 @@ export const updateHighlight = async (payload: UpdateHighlightPayload): Promise<
 
 export const deleteHighlight = async (id: string): Promise<void> => {
   await request({ path: '/highlights/delete', payload: { id } });
+};
+
+export const listTrainingTimes = async ({ userId }: ListTrainingTimesParams = {}): Promise<TrainingDiaryEntry[]> => {
+  const response = await request<TrainingDiaryListResponse>({
+    path: '/training-times/list',
+    payload: { userId },
+  });
+  return extractTrainingTimes(response);
+};
+
+export const addTrainingDuration = async (
+  payload: AddTrainingDurationPayload,
+): Promise<TrainingDiaryEntry> => {
+  const response = await request<TrainingDiaryResponse>({
+    path: '/training-times/add-duration',
+    payload,
+  });
+  return extractTrainingTime(response);
 };

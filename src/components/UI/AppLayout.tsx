@@ -10,6 +10,7 @@ const navItems = [
   { to: '/logs', label: 'Logbuch' },
   { to: '/data', label: 'Daten' },
   { to: '/stats', label: 'Statistiken' },
+  { to: '/training-diary', label: 'Trainingstagebuch' },
 ];
 
 const AppLayout = ({ children }: { children?: ReactNode }) => {

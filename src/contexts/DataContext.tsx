@@ -21,16 +21,19 @@ import {
   createHighlight,
   updateHighlight as updateHighlightRequest,
   deleteHighlight as deleteHighlightRequest,
+  listTrainingTimes,
+  addTrainingDuration as addTrainingDurationRequest,
 } from '../api/client';
-import type { Activity, DailyHighlight, LogEntry } from '../types';
+import type { Activity, DailyHighlight, LogEntry, TrainingDiaryEntry } from '../types';
 import { useAuth } from './AuthContext';
 
-export type { Activity, LogEntry, DailyHighlight } from '../types';
+export type { Activity, LogEntry, DailyHighlight, TrainingDiaryEntry } from '../types';
 
 type DataState = {
   activities: Activity[];
   logs: LogEntry[];
   highlights: DailyHighlight[];
+  trainingTimes: TrainingDiaryEntry[];
 };
 
 type Action =
@@ -45,12 +48,15 @@ type Action =
   | { type: 'SET_HIGHLIGHTS'; payload: DailyHighlight[] }
   | { type: 'ADD_HIGHLIGHT'; payload: DailyHighlight }
   | { type: 'UPDATE_HIGHLIGHT'; payload: DailyHighlight }
-  | { type: 'REMOVE_HIGHLIGHT'; payload: string };
+  | { type: 'REMOVE_HIGHLIGHT'; payload: string }
+  | { type: 'SET_TRAINING_TIMES'; payload: TrainingDiaryEntry[] }
+  | { type: 'UPSERT_TRAINING_TIME'; payload: TrainingDiaryEntry };
 
 const initialState: DataState = {
   activities: [],
   logs: [],
   highlights: [],
+  trainingTimes: [],
 };
 
 const DataContext = createContext<{
@@ -66,6 +72,7 @@ const DataContext = createContext<{
   addHighlight: (input: Omit<DailyHighlight, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateHighlight: (id: string, updates: Partial<DailyHighlight>) => Promise<void>;
   deleteHighlight: (id: string) => Promise<void>;
+  addTrainingDuration: (input: { date: string; minutes: number }) => Promise<void>;
   refresh: () => void;
 } | null>(null);
 
@@ -108,6 +115,16 @@ const reducer = (state: DataState, action: Action): DataState => {
       };
     case 'REMOVE_HIGHLIGHT':
       return { ...state, highlights: state.highlights.filter((highlight) => highlight.id !== action.payload) };
+    case 'SET_TRAINING_TIMES':
+      return { ...state, trainingTimes: action.payload };
+    case 'UPSERT_TRAINING_TIME':
+      return {
+        ...state,
+        trainingTimes: [
+          ...state.trainingTimes.filter((entry) => entry.id !== action.payload.id),
+          action.payload,
+        ],
+      };
     default:
       return state;
   }
@@ -123,6 +140,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (!user) {
       dispatch({ type: 'SET_ACTIVITIES', payload: [] });
       dispatch({ type: 'SET_LOGS', payload: [] });
+      dispatch({ type: 'SET_TRAINING_TIMES', payload: [] });
       setError(null);
       setIsLoading(false);
       return;
@@ -130,14 +148,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoading(true);
     try {
-      const [activityResponse, logResponse, highlightsResponse] = await Promise.all([
+      const [activityResponse, logResponse, highlightsResponse, trainingTimesResponse] = await Promise.all([
         listActivities(),
         listLogs({ userId: user.id }),
         listHighlights({ userId: user.id }),
+        listTrainingTimes({ userId: user.id }),
       ]);
       dispatch({ type: 'SET_ACTIVITIES', payload: activityResponse });
       dispatch({ type: 'SET_LOGS', payload: logResponse });
       dispatch({ type: 'SET_HIGHLIGHTS', payload: highlightsResponse });
+      dispatch({ type: 'SET_TRAINING_TIMES', payload: trainingTimesResponse });
       setError(null);
     } catch (apiError) {
       console.error('Fehler beim Laden der Daten', apiError);
@@ -283,6 +303,20 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const addTrainingDuration = useCallback(
+    async ({ date, minutes }: { date: string; minutes: number }) => {
+      if (!user) throw new Error('Nicht angemeldet');
+      try {
+        const entry = await addTrainingDurationRequest({ date, minutes, userId: user.id });
+        dispatch({ type: 'UPSERT_TRAINING_TIME', payload: entry });
+      } catch (apiError) {
+        console.error('Trainingszeit konnte nicht gespeichert werden', apiError);
+        throw apiError;
+      }
+    },
+    [user],
+  );
+
   const value = useMemo(
     () => ({
       state,
@@ -297,6 +331,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addHighlight,
       updateHighlight,
       deleteHighlight,
+      addTrainingDuration,
       refresh,
     }),
     [
@@ -312,6 +347,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addHighlight,
       updateHighlight,
       deleteHighlight,
+      addTrainingDuration,
       refresh,
     ],
   );

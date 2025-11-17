@@ -61,3 +61,12 @@ export type DailyHighlight = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type TrainingDiaryEntry = {
+  id: string;
+  userId: string;
+  date: string;
+  totalMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+};

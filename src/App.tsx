@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage';
 import AppLayout from './components/UI/AppLayout';
 import ProtectedRoute from './components/UI/ProtectedRoute';
 import DataOverviewPage from './pages/DataOverviewPage';
+import TrainingDiaryPage from './pages/TrainingDiaryPage';
 import PwaLayout from './components/Pwa/PwaLayout';
 import PwaActivitiesPage from './pages/pwa/PwaActivitiesPage';
 import PwaHighlightsPage from './pages/pwa/PwaHighlightsPage';
@@ -91,6 +92,18 @@ const App = () => {
             ) : (
               <ProtectedRoute>
                 <StatsPage />
+              </ProtectedRoute>
+            )
+          }
+        />
+        <Route
+          path="/training-diary"
+          element={
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/activities" replace />
+            ) : (
+              <ProtectedRoute>
+                <TrainingDiaryPage />
               </ProtectedRoute>
             )
           }

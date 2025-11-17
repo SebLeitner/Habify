@@ -7,11 +7,13 @@ const {
   UpdateCommand,
   DeleteCommand,
   QueryCommand,
+  GetCommand,
 } = require('@aws-sdk/lib-dynamodb');
 
 const ACTIVITIES_TABLE = process.env.ACTIVITIES_TABLE;
 const LOGS_TABLE = process.env.LOGS_TABLE;
 const HIGHLIGHTS_TABLE = process.env.HIGHLIGHTS_TABLE;
+const TRAINING_TIMES_TABLE = process.env.TRAINING_TIMES_TABLE;
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -208,6 +210,15 @@ const sanitizeHighlight = (item) => ({
   updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
 });
 
+const sanitizeTrainingTime = (item) => ({
+  id: item.id,
+  userId: item.userId,
+  date: item.date,
+  totalMinutes: Number(item.totalMinutes) || 0,
+  createdAt: item.createdAt ?? new Date().toISOString(),
+  updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
+});
+
 const normalizeHighlightDate = (raw) => {
   if (!raw) {
     throw new HttpError(400, 'Datum ist erforderlich.');
@@ -219,6 +230,25 @@ const normalizeHighlightDate = (raw) => {
   }
 
   return date.toISOString().slice(0, 10);
+};
+
+const normalizeTrainingDate = (raw) => normalizeHighlightDate(raw);
+
+const trainingEntryId = (userId, date) => `${userId}#${date}`;
+
+const findTrainingTimeById = async (id) => {
+  if (!TRAINING_TIMES_TABLE) {
+    throw new HttpError(500, 'Trainingstagebuch-Tabelle ist nicht konfiguriert.');
+  }
+
+  const result = await dynamoClient.send(
+    new GetCommand({
+      TableName: TRAINING_TIMES_TABLE,
+      Key: { id },
+    }),
+  );
+
+  return result.Item;
 };
 
 const listActivities = async () => {
@@ -782,6 +812,70 @@ const deleteHighlight = async (payload) => {
   return respond(200, { success: true });
 };
 
+const listTrainingTimes = async (payload) => {
+  if (!TRAINING_TIMES_TABLE) {
+    throw new HttpError(500, 'Trainingstagebuch-Tabelle ist nicht konfiguriert.');
+  }
+
+  const userId = payload?.userId?.toString();
+  const result = await dynamoClient.send(
+    new ScanCommand({
+      TableName: TRAINING_TIMES_TABLE,
+    }),
+  );
+
+  let items = result.Items ?? [];
+  if (userId) {
+    items = items.filter((item) => item.userId === userId);
+  }
+
+  items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return respond(200, { items: items.map(sanitizeTrainingTime) });
+};
+
+const addTrainingDuration = async (payload) => {
+  if (!TRAINING_TIMES_TABLE) {
+    throw new HttpError(500, 'Trainingstagebuch-Tabelle ist nicht konfiguriert.');
+  }
+
+  const userId = payload?.userId?.toString();
+  const rawDate = payload?.date ?? new Date().toISOString();
+  const date = normalizeTrainingDate(rawDate);
+  const additionalMinutes = Number(payload?.minutes ?? payload?.durationMinutes ?? payload?.duration ?? 0);
+
+  if (!userId) {
+    throw new HttpError(400, 'Benutzer ist erforderlich.');
+  }
+
+  if (!Number.isFinite(additionalMinutes) || additionalMinutes <= 0) {
+    throw new HttpError(400, 'Trainingsdauer muss größer als 0 sein.');
+  }
+
+  const id = trainingEntryId(userId, date);
+  const existing = await findTrainingTimeById(id);
+  const now = new Date().toISOString();
+  const totalMinutes = (Number(existing?.totalMinutes) || 0) + additionalMinutes;
+
+  const item = {
+    id,
+    userId,
+    date,
+    totalMinutes,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  await dynamoClient.send(
+    new PutCommand({
+      TableName: TRAINING_TIMES_TABLE,
+      Item: item,
+    }),
+  );
+
+  return respond(existing ? 200 : 201, { item: sanitizeTrainingTime(item) });
+};
+
 const routeHandlers = {
   '/activities/list': listActivities,
   '/activities/add': addActivity,
@@ -795,6 +889,8 @@ const routeHandlers = {
   '/highlights/add': addHighlight,
   '/highlights/update': updateHighlight,
   '/highlights/delete': deleteHighlight,
+  '/training-times/list': listTrainingTimes,
+  '/training-times/add-duration': addTrainingDuration,
 };
 
 exports.handler = async (event) => {
