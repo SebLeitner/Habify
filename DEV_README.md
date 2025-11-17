@@ -38,6 +38,8 @@ VITE_COGNITO_DEBUG=true
 
 > Hinweis: `VITE_COGNITO_REDIRECT_URI` muss genau der Callback-URL entsprechen, die im User-Pool-Client hinterlegt ist (Terraform setzt standardmäßig `/login`).
 
+> Mobile Builds: Verwende eine App-Deep-Link-URL (z. B. `myapp://auth/callback`) als `VITE_COGNITO_REDIRECT_URI`, damit der PKCE-Callback direkt in der App ankommt.
+
 Typische Fehlermeldung bei nicht erlaubter Redirect-URL:
 ```
 https://<cognito-domain>/error?error=redirect_mismatch&client_id=<client-id>
