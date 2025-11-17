@@ -1,48 +1,18 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { FormEvent, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Button from '../components/UI/Button';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultHomePath } from '../utils/domainRouting';
+import { useAuthCallback } from '../hooks/useAuthCallback';
 
 const LoginPage = () => {
-  const { login, register, completeLogin } = useAuth();
-  const navigate = useNavigate();
+  const { login, register } = useAuth();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const redirectPath = (location.state as { from?: string } | null)?.from;
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [error, setError] = useState<string | null>(null);
+  const { error, setError, isProcessing } = useAuthCallback(redirectPath);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectPath = (location.state as { from?: string } | null)?.from;
-
-  useEffect(() => {
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
-    const errorDescription = searchParams.get('error_description') ?? searchParams.get('error');
-
-    if (errorDescription) {
-      setError(errorDescription);
-    }
-
-    if (!code) {
-      return;
-    }
-
-    const handleCallback = async () => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        const redirect = await completeLogin(code, state ?? undefined);
-        navigate(redirect ?? redirectPath ?? getDefaultHomePath(), { replace: true });
-      } catch (callbackError) {
-        setError(callbackError instanceof Error ? callbackError.message : 'Login konnte nicht abgeschlossen werden.');
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
-
-    void handleCallback();
-  }, [searchParams, completeLogin, navigate, redirectPath]);
+  const isBusy = isSubmitting || isProcessing;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -68,8 +38,8 @@ const LoginPage = () => {
       </p>
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
         {error && <div className="rounded-lg border border-red-500/60 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
-        <Button type="submit" disabled={isSubmitting} className="w-full">
-          {isSubmitting ? 'Bitte warten…' : mode === 'login' ? 'Mit Cognito anmelden' : 'Cognito-Konto erstellen'}
+        <Button type="submit" disabled={isBusy} className="w-full">
+          {isBusy ? 'Bitte warten…' : mode === 'login' ? 'Mit Cognito anmelden' : 'Cognito-Konto erstellen'}
         </Button>
       </form>
       <div className="mt-6 text-sm text-slate-300">

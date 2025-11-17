@@ -19,13 +19,20 @@ export type AuthRedirectState = {
 const getEnv = () => {
   const domain = import.meta.env.VITE_COGNITO_DOMAIN?.replace(/\/$/, '');
   const clientId = import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID;
-  const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI ?? `${window.location.origin}/login`;
+  const envRedirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI;
+  const derivedRedirectUri = window.location.protocol.startsWith('http')
+    ? `${window.location.origin}/login`
+    : undefined;
+  const redirectUri = envRedirectUri ?? derivedRedirectUri;
 
   if (!domain) {
     throw new Error('VITE_COGNITO_DOMAIN ist nicht gesetzt.');
   }
   if (!clientId) {
     throw new Error('VITE_COGNITO_USER_POOL_CLIENT_ID ist nicht gesetzt.');
+  }
+  if (!redirectUri) {
+    throw new Error('VITE_COGNITO_REDIRECT_URI ist nicht gesetzt und konnte nicht abgeleitet werden.');
   }
 
   return { domain, clientId, redirectUri };

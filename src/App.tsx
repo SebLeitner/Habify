@@ -13,6 +13,7 @@ import PwaActivitiesPage from './pages/pwa/PwaActivitiesPage';
 import PwaHighlightsPage from './pages/pwa/PwaHighlightsPage';
 import PwaLogPage from './pages/pwa/PwaLogPage';
 import { getDefaultHomePath, isPwaDomain } from './utils/domainRouting';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 
 const App = () => {
   const defaultHomePath = getDefaultHomePath();
@@ -95,6 +96,7 @@ const App = () => {
           }
         />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
       </Route>
       <Route
         path="/pwa"
