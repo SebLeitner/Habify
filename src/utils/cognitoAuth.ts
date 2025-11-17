@@ -209,11 +209,13 @@ export const exchangeCodeForSession = async (code: string, stateParam?: string) 
   const storedState = storedStateValue ? decodeState(storedStateValue) : null;
   const incomingState = stateParam ? decodeState(stateParam) : null;
 
-  if (!storedState || !storedState.codeVerifier) {
+  const state = storedState ?? incomingState;
+
+  if (!state || !state.codeVerifier) {
     throw new Error('Es wurde kein PKCE-State gefunden. Starte den Login erneut.');
   }
 
-  if (incomingState && incomingState.codeVerifier !== storedState.codeVerifier) {
+  if (storedState && incomingState && incomingState.codeVerifier !== storedState.codeVerifier) {
     throw new Error('Ungültiger OAuth-State erhalten.');
   }
 
@@ -224,12 +226,12 @@ export const exchangeCodeForSession = async (code: string, stateParam?: string) 
     code,
     client_id: clientId,
     redirect_uri: redirectUri,
-    code_verifier: storedState.codeVerifier,
+    code_verifier: state.codeVerifier,
   });
 
   persistSession(result.session);
   debugLog('Authorization Code eingelöst', {
-    redirectPath: storedState.redirectPath ?? 'none',
+    redirectPath: state.redirectPath ?? 'none',
     session: {
       expiresAt: new Date(result.session.expiresAt).toISOString(),
       accessToken: maskToken(result.session.accessToken),
@@ -240,7 +242,7 @@ export const exchangeCodeForSession = async (code: string, stateParam?: string) 
   });
   clearPkceState();
 
-  return { ...result, redirectPath: storedState.redirectPath };
+  return { ...result, redirectPath: state.redirectPath };
 };
 
 export const refreshWithToken = async (refreshToken: string) => {
