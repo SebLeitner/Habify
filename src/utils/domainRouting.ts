@@ -7,9 +7,14 @@ const normalizeHost = (value?: string) =>
 const getPwaHostname = () => normalizeHost(import.meta.env.VITE_PWA_APP_DOMAIN);
 
 export const isPwaDomain = () => {
+  const currentHost = window.location.hostname.toLowerCase();
   const pwaHost = getPwaHostname();
-  if (!pwaHost) return false;
-  return window.location.hostname.toLowerCase() === pwaHost;
+
+  if (pwaHost) {
+    return currentHost === pwaHost;
+  }
+
+  return currentHost.startsWith('app.');
 };
 
 export const getDefaultHomePath = () => (isPwaDomain() ? '/pwa/activities' : '/activities');
