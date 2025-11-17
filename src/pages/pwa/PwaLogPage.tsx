@@ -1,5 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useData } from '../../contexts/DataContext';
+import LogDetailsDialog from '../../components/Log/LogDetailsDialog';
+import { formatAttributeValue } from '../../utils/logFormatting';
+import type { LogEntry } from '../../types';
 
 type UnifiedEntry =
   | {
@@ -10,6 +13,11 @@ type UnifiedEntry =
       title: string;
       meta: string;
       note?: string;
+      activityId: string;
+      attributes?: LogEntry['attributes'];
+      icon?: string;
+      userId: string;
+      logId: string;
     }
   | {
       id: string;
@@ -49,6 +57,11 @@ const PwaLogPage = () => {
         title: activity?.name ?? 'Aktivität',
         meta: `${activity?.icon ?? '📝'} • ${formatTime(log.timestamp)}`,
         note: log.note,
+        activityId: log.activityId,
+        attributes: log.attributes,
+        icon: activity?.icon,
+        userId: log.userId,
+        logId: log.id,
       };
     });
 
@@ -70,6 +83,13 @@ const PwaLogPage = () => {
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
   }, [state.activities, state.highlights, state.logs]);
+
+  const activityById = useMemo(
+    () => new Map(state.activities.map((activity) => [activity.id, activity])),
+    [state.activities],
+  );
+
+  const [selectedLog, setSelectedLog] = useState<UnifiedEntry | null>(null);
 
   return (
     <div className="space-y-4">
@@ -97,7 +117,19 @@ const PwaLogPage = () => {
                     {formatDateHeading(entry.dateKey)}
                   </div>
                 )}
-                <article className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-3">
+                <article
+                  className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-3 transition hover:border-slate-700 hover:bg-slate-900"
+                  onClick={() => entry.type === 'log' && setSelectedLog(entry)}
+                  role={entry.type === 'log' ? 'button' : undefined}
+                  tabIndex={entry.type === 'log' ? 0 : -1}
+                  onKeyDown={(event) => {
+                    if (entry.type !== 'log') return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedLog(entry);
+                    }
+                  }}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-white">{entry.title}</p>
@@ -114,11 +146,52 @@ const PwaLogPage = () => {
                     </span>
                   </div>
                   {entry.note && <p className="mt-2 text-sm text-slate-200">{entry.note}</p>}
+                  {entry.type === 'log' && !!entry.attributes?.length && (
+                    <div className="mt-3 space-y-1 text-xs text-slate-300">
+                      {entry.attributes.map((attributeValue) => {
+                        const activityAttribute = activityById
+                          .get(entry.activityId)
+                          ?.attributes.find((attr) => attr.id === attributeValue.attributeId);
+                        const formatted = formatAttributeValue(activityAttribute, attributeValue);
+                        if (!formatted) {
+                          return null;
+                        }
+                        return (
+                          <div key={`${entry.id}-${attributeValue.attributeId}`}>
+                            <span className="font-semibold text-slate-200">
+                              {activityAttribute?.name ?? 'Attribut'}:
+                            </span>{' '}
+                            <span>{formatted}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </article>
               </div>
             );
           })}
         </div>
+      )}
+
+      {selectedLog && selectedLog.type === 'log' && (
+        <LogDetailsDialog
+          log={{
+            id: selectedLog.logId,
+            activityId: selectedLog.activityId,
+            timestamp: selectedLog.timestamp,
+            note: selectedLog.note,
+            attributes: selectedLog.attributes,
+            userId: selectedLog.userId,
+          }}
+          activity={activityById.get(selectedLog.activityId)}
+          open={!!selectedLog}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedLog(null);
+            }
+          }}
+        />
       )}
     </div>
   );
