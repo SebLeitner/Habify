@@ -16,14 +16,44 @@ export type AuthRedirectState = {
   codeVerifier: string;
 };
 
+const deriveRedirectUri = () => {
+  if (!window.location.protocol.startsWith('http')) {
+    return undefined;
+  }
+
+  return `${window.location.origin}/login`;
+};
+
+const resolveRedirectUri = (envRedirectUri?: string, derivedRedirectUri?: string) => {
+  if (!derivedRedirectUri) {
+    return envRedirectUri;
+  }
+
+  if (!envRedirectUri) {
+    return derivedRedirectUri;
+  }
+
+  try {
+    const envOrigin = new URL(envRedirectUri).origin;
+    const derivedOrigin = new URL(derivedRedirectUri).origin;
+
+    if (envOrigin !== derivedOrigin) {
+      return derivedRedirectUri;
+    }
+  } catch (error) {
+    console.error('Redirect-URL konnte nicht geprüft werden', error);
+    return derivedRedirectUri;
+  }
+
+  return envRedirectUri;
+};
+
 const getEnv = () => {
   const domain = import.meta.env.VITE_COGNITO_DOMAIN?.replace(/\/$/, '');
   const clientId = import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID;
   const envRedirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI;
-  const derivedRedirectUri = window.location.protocol.startsWith('http')
-    ? `${window.location.origin}/login`
-    : undefined;
-  const redirectUri = envRedirectUri ?? derivedRedirectUri;
+  const derivedRedirectUri = deriveRedirectUri();
+  const redirectUri = resolveRedirectUri(envRedirectUri, derivedRedirectUri);
 
   if (!domain) {
     throw new Error('VITE_COGNITO_DOMAIN ist nicht gesetzt.');
