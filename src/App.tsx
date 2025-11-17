@@ -12,58 +12,86 @@ import PwaLayout from './components/Pwa/PwaLayout';
 import PwaActivitiesPage from './pages/pwa/PwaActivitiesPage';
 import PwaHighlightsPage from './pages/pwa/PwaHighlightsPage';
 import PwaLogPage from './pages/pwa/PwaLogPage';
+import { getDefaultHomePath, isPwaDomain } from './utils/domainRouting';
 
 const App = () => {
+  const defaultHomePath = getDefaultHomePath();
+  const shouldRedirectToPwa = isPwaDomain();
+
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Navigate to="/activities" replace />} />
+        <Route path="/" element={<Navigate to={defaultHomePath} replace />} />
         <Route
           path="/activities"
           element={
-            <ProtectedRoute>
-              <ActivitiesPage />
-            </ProtectedRoute>
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/activities" replace />
+            ) : (
+              <ProtectedRoute>
+                <ActivitiesPage />
+              </ProtectedRoute>
+            )
           }
         />
         <Route
           path="/editor"
           element={
-            <ProtectedRoute>
-              <ActivityEditorPage />
-            </ProtectedRoute>
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/activities" replace />
+            ) : (
+              <ProtectedRoute>
+                <ActivityEditorPage />
+              </ProtectedRoute>
+            )
           }
         />
         <Route
           path="/logs"
           element={
-            <ProtectedRoute>
-              <LogsPage />
-            </ProtectedRoute>
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/log" replace />
+            ) : (
+              <ProtectedRoute>
+                <LogsPage />
+              </ProtectedRoute>
+            )
           }
         />
         <Route
           path="/data"
           element={
-            <ProtectedRoute>
-              <DataOverviewPage />
-            </ProtectedRoute>
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/activities" replace />
+            ) : (
+              <ProtectedRoute>
+                <DataOverviewPage />
+              </ProtectedRoute>
+            )
           }
         />
         <Route
           path="/highlights"
           element={
-            <ProtectedRoute>
-              <HighlightsPage />
-            </ProtectedRoute>
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/highlights" replace />
+            ) : (
+              <ProtectedRoute>
+                <HighlightsPage />
+              </ProtectedRoute>
+            )
           }
         />
         <Route
           path="/stats"
           element={
-            <ProtectedRoute>
-              <StatsPage />
-            </ProtectedRoute>
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/activities" replace />
+            ) : (
+              <ProtectedRoute>
+                <StatsPage />
+              </ProtectedRoute>
+            )
           }
         />
         <Route path="/login" element={<LoginPage />} />
@@ -81,7 +109,7 @@ const App = () => {
         <Route path="highlights" element={<PwaHighlightsPage />} />
         <Route path="log" element={<PwaLogPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/activities" replace />} />
+      <Route path="*" element={<Navigate to={defaultHomePath} replace />} />
     </Routes>
   );
 };

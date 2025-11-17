@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '../components/UI/Button';
 import { useAuth } from '../contexts/AuthContext';
+import { getDefaultHomePath } from '../utils/domainRouting';
 
 const LoginPage = () => {
   const { login, register, completeLogin } = useAuth();
@@ -32,7 +33,7 @@ const LoginPage = () => {
       setError(null);
       try {
         const redirect = await completeLogin(code, state ?? undefined);
-        navigate(redirect ?? redirectPath ?? '/activities', { replace: true });
+        navigate(redirect ?? redirectPath ?? getDefaultHomePath(), { replace: true });
       } catch (callbackError) {
         setError(callbackError instanceof Error ? callbackError.message : 'Login konnte nicht abgeschlossen werden.');
       } finally {
