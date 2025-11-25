@@ -1,4 +1,5 @@
 import { AuthUser } from '../types/auth';
+import { getEnvValue } from './runtimeEnv';
 
 const SESSION_KEY = 'habify-cognito-session';
 const PKCE_STATE_KEY = 'habify-cognito-pkce-state';
@@ -49,9 +50,9 @@ const resolveRedirectUri = (envRedirectUri?: string, derivedRedirectUri?: string
 };
 
 const getEnv = () => {
-  const domain = import.meta.env.VITE_COGNITO_DOMAIN?.replace(/\/$/, '');
-  const clientId = import.meta.env.VITE_COGNITO_USER_POOL_CLIENT_ID;
-  const envRedirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI;
+  const domain = getEnvValue('VITE_COGNITO_DOMAIN')?.replace(/\/$/, '');
+  const clientId = getEnvValue('VITE_COGNITO_USER_POOL_CLIENT_ID');
+  const envRedirectUri = getEnvValue('VITE_COGNITO_REDIRECT_URI');
   const derivedRedirectUri = deriveRedirectUri();
   const redirectUri = resolveRedirectUri(envRedirectUri, derivedRedirectUri);
 
@@ -68,7 +69,7 @@ const getEnv = () => {
   return { domain, clientId, redirectUri };
 };
 
-const isDebugEnabled = () => `${import.meta.env[DEBUG_FLAG]}`.toLowerCase() === 'true';
+const isDebugEnabled = () => `${getEnvValue(DEBUG_FLAG)}`.toLowerCase() === 'true';
 
 const maskToken = (token?: string | null) => {
   if (!token) return token;

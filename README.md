@@ -73,6 +73,22 @@ terraform apply \
 
 Nach erfolgreicher Bereitstellung ist das Frontend automatisch unter `https://habify.leitnersoft.com` erreichbar (bzw. unter der angegebenen Domain). Parallel wird eine dedizierte PWA-Variante für mobile Nutzer unter `https://app.habify.leitnersoft.com` bereitgestellt. Terraform leitet die Cognito-Callback- und Logout-URLs automatisch aus beiden Domains ab. Die Outputs liefern zusätzlich `cloudfront_url` (CDN-URL), `api_url` (API-Basis), `app_domain` (konfigurierte Domain), `pwa_app_domain` (PWA-Subdomain) sowie `cognito_user_pool_id` und `cognito_user_pool_client_id` für die Authentifizierung.
 
+### Runtime-Umgebungsvariablen (ohne Neu-Build)
+
+Das Frontend liest Cognito- und API-Werte zur Laufzeit aus `public/runtime-env.js`. Dieses Skript wird vor dem eigentlichen Bundle geladen und kann beim Deployment überschrieben werden, ohne den Build neu auszuführen (z. B. durch Anpassen der Datei im S3-Bucket oder via CI-Job). Beispielinhalt:
+
+```js
+window.__HABIFY_ENV__ = {
+  VITE_COGNITO_DOMAIN: 'https://example.auth.eu-central-1.amazoncognito.com',
+  VITE_COGNITO_USER_POOL_CLIENT_ID: 'spa-client-id',
+  VITE_COGNITO_REDIRECT_URI: 'https://app.example.com/login',
+  VITE_API_URL: 'https://api.example.com',
+  VITE_COGNITO_DEBUG: 'false',
+};
+```
+
+Falls `runtime-env.js` keine Werte enthält, greift die App auf die zur Buildzeit gesetzten `VITE_*`-Variablen zurück. Dadurch lässt sich der Fehler „VITE_COGNITO_DOMAIN ist nicht gesetzt“ auch nach dem Deployment beheben, indem die Datei mit den richtigen Cognito-Werten gefüllt wird.
+
 ## Tests
 
 Für das Frontend können mit `npm run lint` statische Analysen ausgeführt werden. Unit-Tests können bei Bedarf ergänzt werden.
