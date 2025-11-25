@@ -2,14 +2,14 @@ import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
 import TextArea from '../../components/UI/TextArea';
-import { DailyHighlight, useData } from '../../contexts/DataContext';
+import { useData } from '../../contexts/DataContext';
 import { formatDateForDisplay, parseDisplayDateToISO } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PwaHighlightsPage = () => {
-  const { state, addHighlight, deleteHighlight, isLoading, error } = useData();
+  const { state, addHighlight, isLoading, error } = useData();
   const firefox = isFirefox();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -63,20 +63,6 @@ const PwaHighlightsPage = () => {
       setFormError(message);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (highlight: DailyHighlight) => {
-    setFormError(null);
-    try {
-      await deleteHighlight(highlight.id);
-    } catch (deleteError) {
-      console.error('PWA: Highlight konnte nicht gelöscht werden', deleteError);
-      const message =
-        deleteError instanceof Error
-          ? deleteError.message
-          : 'Löschen nicht möglich – Backend-Verbindung prüfen.';
-      setFormError(message);
     }
   };
 
@@ -142,13 +128,7 @@ const PwaHighlightsPage = () => {
                   <p className="text-sm font-semibold text-white">{highlight.title}</p>
                   <p className="text-sm text-slate-300">{highlight.text}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(highlight)}
-                  className="rounded-lg bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-200 transition hover:bg-red-900/40 hover:text-red-100"
-                >
-                  Löschen
-                </button>
+                <span className="text-[11px] uppercase tracking-wide text-slate-500">Löschen in der PWA deaktiviert</span>
               </li>
             ))}
           </ul>

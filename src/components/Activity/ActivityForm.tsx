@@ -15,11 +15,13 @@ const ActivityForm = ({
   onSubmit,
   onCancel,
   existingCategories,
+  isSubmitting = false,
 }: {
   initialActivity?: Activity;
   onSubmit: (values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => void | Promise<void>;
   onCancel?: () => void;
   existingCategories: string[];
+  isSubmitting?: boolean;
 }) => {
   const [name, setName] = useState(initialActivity?.name ?? '');
   const [icon, setIcon] = useState(initialActivity?.icon ?? '💧');
@@ -85,11 +87,13 @@ const ActivityForm = ({
       </label>
       <div className="flex items-center justify-end gap-3">
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
             Abbrechen
           </Button>
         )}
-        <Button type="submit">Speichern</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Speichern …' : 'Speichern'}
+        </Button>
       </div>
     </form>
   );
