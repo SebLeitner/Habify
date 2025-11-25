@@ -1,5 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
+import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import AttributeValuesForm from '../../components/Log/AttributeValuesForm';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -160,6 +161,40 @@ const PwaActivitiesPage = () => {
     [state.activities],
   );
 
+  const activityStats = useMemo(() => {
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+    const weekStart = startOfDay(subDays(todayStart, 6));
+
+    const stats = new Map<string, { lastLog: Date | null; todayCount: number; weekCount: number }>();
+
+    state.logs.forEach((log) => {
+      const timestamp = new Date(log.timestamp);
+      const current = stats.get(log.activityId) ?? { lastLog: null, todayCount: 0, weekCount: 0 };
+
+      const lastLog = !current.lastLog || timestamp > current.lastLog ? timestamp : current.lastLog;
+      const todayCount =
+        current.todayCount + (isWithinInterval(timestamp, { start: todayStart, end: todayEnd }) ? 1 : 0);
+      const weekCount =
+        current.weekCount + (isWithinInterval(timestamp, { start: weekStart, end: todayEnd }) ? 1 : 0);
+
+      stats.set(log.activityId, { lastLog, todayCount, weekCount });
+    });
+
+    return stats;
+  }, [state.logs]);
+
+  const formatLastLogLabel = (lastLog: Date | null) => {
+    if (!lastLog) return 'Noch kein Log';
+
+    const daysAgo = differenceInCalendarDays(startOfDay(new Date()), startOfDay(lastLog));
+
+    if (daysAgo === 0) return 'Heute';
+    if (daysAgo === 1) return 'Gestern';
+    if (daysAgo === 2) return 'Vor 2 Tagen';
+    return 'Längere Pause';
+  };
+
   const handleAddLog = async (values: { activityId: string; timestamp: string; note?: string; attributes?: LogAttributeValue[] }) => {
     setActionError(null);
     try {
@@ -202,8 +237,26 @@ const PwaActivitiesPage = () => {
                 {activity.icon}
               </span>
               <div className="flex-1 space-y-1">
-                <p className="text-base font-semibold text-white">{activity.name}</p>
-                <p className="text-xs text-slate-400">Tippen zum Eintragen • zuletzt {new Date(activity.updatedAt).toLocaleDateString('de-DE')}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-base font-semibold text-white">{activity.name}</p>
+                  {activity.categories.some((category) => {
+                    const normalized = category.toLowerCase();
+                    return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
+                  }) && (
+                    <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
+                      {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
+                <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                  <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                    Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
+                  </span>
+                  <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                    Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
+                  </span>
+                </div>
                 {activity.categories?.length ? (
                   <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
                     {activity.categories.map((category) => (
