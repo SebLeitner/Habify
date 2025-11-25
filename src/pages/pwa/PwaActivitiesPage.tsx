@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
 import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import AttributeValuesForm from '../../components/Log/AttributeValuesForm';
+import ActivityForm from '../../components/Activity/ActivityForm';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
 import TextArea from '../../components/UI/TextArea';
@@ -152,14 +153,25 @@ const ActivityLogForm = ({ activity, onAddLog, onClose }: ActivityLogFormProps) 
 };
 
 const PwaActivitiesPage = () => {
-  const { state, addLog, isLoading, error } = useData();
+  const { state, addLog, updateActivity, deleteActivity, isLoading, error } = useData();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [activityFormError, setActivityFormError] = useState<string | null>(null);
+  const [isProcessingActivity, setIsProcessingActivity] = useState(false);
 
   const activities = useMemo(
     () => state.activities.filter((activity) => activity.active).sort((a, b) => a.name.localeCompare(b.name, 'de')),
     [state.activities],
   );
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    state.activities.forEach((activity) => {
+      activity.categories?.forEach((category) => set.add(category));
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [state.activities]);
 
   const activityStats = useMemo(() => {
     const todayStart = startOfDay(new Date());
@@ -206,6 +218,56 @@ const PwaActivitiesPage = () => {
     }
   };
 
+  const handleUpdateActivity = async (
+    values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>,
+  ) => {
+    if (!editingActivity || isProcessingActivity) return;
+
+    setIsProcessingActivity(true);
+    setActivityFormError(null);
+    try {
+      await updateActivity(editingActivity.id, values);
+      setEditingActivity(null);
+    } catch (apiError) {
+      console.error('PWA: Aktivität konnte nicht aktualisiert werden', apiError);
+      const message =
+        apiError instanceof Error
+          ? apiError.message
+          : 'Aktualisierung nicht möglich – bitte stelle die Verbindung zum Backend sicher.';
+      setActivityFormError(message);
+    } finally {
+      setIsProcessingActivity(false);
+    }
+  };
+
+  const handleDeleteActivity = async (activity: Activity) => {
+    if (isProcessingActivity) return;
+
+    const confirmed = window.confirm(`Aktivität "${activity.name}" löschen?`);
+    if (!confirmed) return;
+
+    setIsProcessingActivity(true);
+    setActionError(null);
+    try {
+      await deleteActivity(activity.id);
+      if (selectedActivity?.id === activity.id) {
+        setSelectedActivity(null);
+      }
+      if (editingActivity?.id === activity.id) {
+        setEditingActivity(null);
+      }
+    } catch (apiError) {
+      console.error('PWA: Aktivität konnte nicht gelöscht werden', apiError);
+      const message =
+        apiError instanceof Error
+          ? apiError.message
+          : 'Löschen nicht möglich – bitte stelle die Verbindung zum Backend sicher.';
+      setActionError(message);
+    } finally {
+      setIsProcessingActivity(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -224,52 +286,72 @@ const PwaActivitiesPage = () => {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {activities.map((activity) => (
-            <button
-              key={activity.id}
-              type="button"
-              onClick={() => setSelectedActivity(activity)}
-              className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-left transition hover:border-brand-secondary/60 hover:shadow-inner hover:shadow-brand-secondary/10"
-            >
-              <span
-                className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
-                style={{ backgroundColor: `${activity.color}33` }}
+            <div key={activity.id} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setSelectedActivity(activity)}
+                className="flex w-full items-start gap-3 text-left transition hover:text-white"
               >
-                {activity.icon}
-              </span>
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-base font-semibold text-white">{activity.name}</p>
-                  {activity.categories.some((category) => {
-                    const normalized = category.toLowerCase();
-                    return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
-                  }) && (
-                    <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
-                      {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                <span
+                  className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                  style={{ backgroundColor: `${activity.color}33` }}
+                >
+                  {activity.icon}
+                </span>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-base font-semibold text-white">{activity.name}</p>
+                    {activity.categories.some((category) => {
+                      const normalized = category.toLowerCase();
+                      return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
+                    }) && (
+                      <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
+                        {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
+                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                      Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
                     </span>
+                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                      Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
+                    </span>
+                  </div>
+                  {activity.categories?.length ? (
+                    <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
+                      {activity.categories.map((category) => (
+                        <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
+                          {category}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
                   )}
                 </div>
-                <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
-                <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                    Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
-                  </span>
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                    Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
-                  </span>
-                </div>
-                {activity.categories?.length ? (
-                  <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
-                    {activity.categories.map((category) => (
-                      <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
-                        {category}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
-                )}
+              </button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setEditingActivity(activity)}
+                  disabled={isProcessingActivity}
+                >
+                  Bearbeiten
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-red-200 hover:text-red-50"
+                  onClick={() => handleDeleteActivity(activity)}
+                  disabled={isProcessingActivity}
+                >
+                  Löschen
+                </Button>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -303,6 +385,45 @@ const PwaActivitiesPage = () => {
                   activity={selectedActivity}
                   onAddLog={handleAddLog}
                   onClose={() => setSelectedActivity(null)}
+                />
+              </div>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={!!editingActivity} onOpenChange={() => setEditingActivity(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl focus:outline-none">
+            {editingActivity && (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <span
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                    style={{ backgroundColor: `${editingActivity.color}33` }}
+                  >
+                    {editingActivity.icon}
+                  </span>
+                  <div className="flex-1">
+                    <Dialog.Title className="text-lg font-semibold text-white">Aktivität bearbeiten</Dialog.Title>
+                    <Dialog.Description className="text-sm text-slate-400">
+                      Änderungen werden direkt gespeichert. Verbindung zum Backend erforderlich.
+                    </Dialog.Description>
+                  </div>
+                  <Dialog.Close asChild>
+                    <button className="ml-auto rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
+                      ✕
+                    </button>
+                  </Dialog.Close>
+                </div>
+                {activityFormError && <p className="text-sm text-red-400">{activityFormError}</p>}
+                <ActivityForm
+                  initialActivity={editingActivity}
+                  onSubmit={handleUpdateActivity}
+                  onCancel={() => setEditingActivity(null)}
+                  existingCategories={categories}
+                  isSubmitting={isProcessingActivity}
                 />
               </div>
             )}
