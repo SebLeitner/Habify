@@ -1,3 +1,4 @@
+import * as Dialog from '@radix-ui/react-dialog';
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import {
   addDays,
@@ -12,6 +13,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { de } from 'date-fns/locale';
+import LogForm from '../components/Log/LogForm';
 import LogList from '../components/Log/LogList';
 import Button from '../components/UI/Button';
 import Spinner from '../components/UI/Spinner';
@@ -149,13 +151,16 @@ const downloadPdf = (filename: string, pages: string[][]) => {
 };
 
 const LogsPage = () => {
-  const { state, deleteLog, deleteHighlight, isLoading, error } = useData();
+  const { state, deleteLog, deleteHighlight, isLoading, error, updateLog } = useData();
   const firefox = isFirefox();
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
   const [firefoxDatePickerValue, setFirefoxDatePickerValue] = useState(() =>
     firefox ? formatDateForDisplay(format(startOfDay(new Date()), 'yyyy-MM-dd')) : '',
   );
   const [highlightError, setHighlightError] = useState<string | null>(null);
+  const [editingLog, setEditingLog] = useState<LogEntry | null>(null);
+  const [logActionError, setLogActionError] = useState<string | null>(null);
+  const [, setIsProcessingLog] = useState(false);
   const [exportStart, setExportStart] = useState(() =>
     format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'),
   );
@@ -237,8 +242,43 @@ const LogsPage = () => {
   const disableNextDay = isSameDay(selectedDate, today) || isAfter(selectedDate, today);
 
   const handleDelete = async (log: LogEntry) => {
-    if (window.confirm('Log-Eintrag wirklich löschen?')) {
+    if (!window.confirm('Log-Eintrag wirklich löschen?')) return;
+
+    setLogActionError(null);
+    setIsProcessingLog(true);
+    try {
       await deleteLog(log.id);
+      if (editingLog?.id === log.id) {
+        setEditingLog(null);
+      }
+    } catch (apiError) {
+      const message =
+        apiError instanceof Error ? apiError.message : 'Log-Eintrag konnte nicht gelöscht werden.';
+      setLogActionError(message);
+    } finally {
+      setIsProcessingLog(false);
+    }
+  };
+
+  const handleEdit = (log: LogEntry) => {
+    setLogActionError(null);
+    setEditingLog(log);
+  };
+
+  const handleUpdateLog = async (values: Parameters<typeof updateLog>[1]) => {
+    if (!editingLog) return;
+
+    setIsProcessingLog(true);
+    setLogActionError(null);
+    try {
+      await updateLog(editingLog.id, values);
+      setEditingLog(null);
+    } catch (apiError) {
+      const message =
+        apiError instanceof Error ? apiError.message : 'Log-Eintrag konnte nicht aktualisiert werden.';
+      setLogActionError(message);
+    } finally {
+      setIsProcessingLog(false);
     }
   };
 
@@ -484,13 +524,54 @@ const LogsPage = () => {
         onDelete={handleDeleteHighlight}
         error={highlightError}
       />
+      {logActionError && <p className="text-sm text-red-400">{logActionError}</p>}
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Spinner label="Lade Logbuch" />
         </div>
       ) : (
-        <LogList logs={filteredLogs} activities={state.activities} onDelete={handleDelete} />
+        <LogList
+          logs={filteredLogs}
+          activities={state.activities}
+          onDelete={handleDelete}
+          onEdit={handleEdit}
+        />
       )}
+
+      <Dialog.Root open={!!editingLog} onOpenChange={(open) => !open && setEditingLog(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl focus:outline-none">
+            {editingLog && (
+              <div className="flex max-h-[85vh] flex-col">
+                <header className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4">
+                  <div>
+                    <Dialog.Title className="text-lg font-semibold text-white">Log-Eintrag bearbeiten</Dialog.Title>
+                    <Dialog.Description className="text-sm text-slate-400">
+                      Änderungen werden direkt gespeichert. Verbindung zum Backend erforderlich.
+                    </Dialog.Description>
+                  </div>
+                  <Dialog.Close asChild>
+                    <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-700 hover:text-white">
+                      ✕
+                    </button>
+                  </Dialog.Close>
+                </header>
+                <div className="flex-1 overflow-y-auto px-6 pb-6">
+                  <div className="space-y-4 pt-4">
+                    <LogForm
+                      activities={state.activities}
+                      initialLog={editingLog}
+                      onSubmit={handleUpdateLog}
+                      onCancel={() => setEditingLog(null)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 };
