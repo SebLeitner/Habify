@@ -116,7 +116,7 @@ const PwaLogPage = () => {
     setLogActionError(null);
     try {
       await deleteLog(logId);
-      if (selectedLog?.logId === logId) {
+      if (selectedLog?.type === 'log' && selectedLog.logId === logId) {
         setSelectedLog(null);
       }
       if (editingLog?.id === logId) {
