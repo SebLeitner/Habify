@@ -71,7 +71,7 @@ const ActivitiesPage = () => {
           <Spinner label="Lade Aktivitäten" />
         </div>
       ) : (
-        <ActivityQuickLogList activities={activities} onAddLog={addLog} dense />
+        <ActivityQuickLogList activities={activities} logs={state.logs} onAddLog={addLog} dense />
       )}
     </div>
   );

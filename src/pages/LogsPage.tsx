@@ -533,6 +533,7 @@ const LogsPage = () => {
         <LogList
           logs={filteredLogs}
           activities={state.activities}
+          allLogs={state.logs}
           onDelete={handleDelete}
           onEdit={handleEdit}
         />
@@ -561,6 +562,7 @@ const LogsPage = () => {
                   <div className="space-y-4 pt-4">
                     <LogForm
                       activities={state.activities}
+                      logs={state.logs}
                       initialLog={editingLog}
                       onSubmit={handleUpdateLog}
                       onCancel={() => setEditingLog(null)}

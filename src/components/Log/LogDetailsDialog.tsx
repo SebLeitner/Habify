@@ -1,15 +1,17 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Activity, LogEntry } from '../../contexts/DataContext';
 import { formatAttributeValue, formatLogTimestamp } from '../../utils/logFormatting';
+import WeeklyActivityOverview from './WeeklyActivityOverview';
 
 type LogDetailsDialogProps = {
   log: LogEntry;
   activity?: Activity;
+  logs: LogEntry[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-const LogDetailsDialog = ({ log, activity, open, onOpenChange }: LogDetailsDialogProps) => {
+const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetailsDialogProps) => {
   const accentColor = `${activity?.color ?? '#475569'}33`;
 
   return (
@@ -39,6 +41,13 @@ const LogDetailsDialog = ({ log, activity, open, onOpenChange }: LogDetailsDialo
           </header>
 
           <div className="space-y-6 px-6 py-5">
+            {activity && (
+              <WeeklyActivityOverview
+                activityId={activity.id}
+                logs={logs}
+                className="border border-slate-800 bg-slate-900/60"
+              />
+            )}
             {log.note && (
               <section className="space-y-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Notiz</h3>

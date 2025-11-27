@@ -1,5 +1,5 @@
-import { ChangeEvent, useEffect, useState } from 'react';
-import { Activity } from '../../contexts/DataContext';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { Activity, type LogEntry } from '../../contexts/DataContext';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
 import TextArea from '../UI/TextArea';
@@ -15,6 +15,7 @@ import AttributeValuesForm from '../Log/AttributeValuesForm';
 import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 import type { LogAttributeValue } from '../../types';
 import { isFirefox } from '../../utils/browser';
+import WeeklyActivityOverview from '../Log/WeeklyActivityOverview';
 
 type ActivityQuickLogListProps = {
   activities: Activity[];
@@ -24,16 +25,19 @@ type ActivityQuickLogListProps = {
     note?: string;
     attributes?: LogAttributeValue[];
   }) => Promise<void>;
+  logs: LogEntry[];
   dense?: boolean;
 };
 
 const ActivityCard = ({
   activity,
   onAddLog,
+  logs,
   dense,
 }: {
   activity: Activity;
   onAddLog: (values: { activityId: string; timestamp: string; note?: string; attributes?: LogAttributeValue[] }) => Promise<void>;
+  logs: LogEntry[];
   dense?: boolean;
 }) => {
   const firefox = isFirefox();
@@ -193,6 +197,7 @@ const ActivityCard = ({
               Speichere einen Log-Eintrag für diese Aktivität. Die Werte werden nach dem Speichern automatisch zurückgesetzt.
             </p>
           )}
+          <WeeklyActivityOverview activityId={activity.id} logs={logs} />
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="grid gap-3 sm:grid-cols-2">
               <Input
@@ -239,7 +244,18 @@ const ActivityCard = ({
   );
 };
 
-const ActivityQuickLogList = ({ activities, onAddLog, dense = false }: ActivityQuickLogListProps) => {
+const ActivityQuickLogList = ({ activities, onAddLog, logs, dense = false }: ActivityQuickLogListProps) => {
+  const activitiesLogs = useMemo(() => {
+    const map = new Map<string, LogEntry[]>();
+    activities.forEach((activity) => {
+      map.set(
+        activity.id,
+        logs.filter((log) => log.activityId === activity.id),
+      );
+    });
+    return map;
+  }, [activities, logs]);
+
   if (!activities.length) {
     return <p className="text-sm text-slate-400">Noch keine Aktivitäten angelegt.</p>;
   }
@@ -247,7 +263,13 @@ const ActivityQuickLogList = ({ activities, onAddLog, dense = false }: ActivityQ
   return (
     <div className={dense ? 'space-y-3' : 'grid gap-4 md:grid-cols-2'}>
       {activities.map((activity) => (
-        <ActivityCard key={activity.id} activity={activity} onAddLog={onAddLog} dense={dense} />
+        <ActivityCard
+          key={activity.id}
+          activity={activity}
+          logs={activitiesLogs.get(activity.id) ?? []}
+          onAddLog={onAddLog}
+          dense={dense}
+        />
       ))}
     </div>
   );
