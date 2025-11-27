@@ -14,16 +14,19 @@ import {
   toLocalTimeInput,
 } from '../../utils/datetime';
 import AttributeValuesForm from './AttributeValuesForm';
+import WeeklyActivityOverview from './WeeklyActivityOverview';
 import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 import { isFirefox } from '../../utils/browser';
 
 const LogForm = ({
   activities,
+  logs,
   initialLog,
   onSubmit,
   onCancel,
 }: {
   activities: Activity[];
+  logs: LogEntry[];
   initialLog?: LogEntry;
   onSubmit: (values: {
     activityId: string;
@@ -170,6 +173,7 @@ const LogForm = ({
         />
       </div>
       <AttributeValuesForm attributes={selectedActivity.attributes} drafts={drafts} onChange={setDrafts} />
+      {selectedActivity && <WeeklyActivityOverview activityId={selectedActivity.id} logs={logs} />}
       <TextArea label="Notiz" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
       <div className="flex items-center justify-end gap-3">
         {onCancel && (

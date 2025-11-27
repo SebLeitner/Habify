@@ -2,10 +2,11 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
 import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import AttributeValuesForm from '../../components/Log/AttributeValuesForm';
+import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
 import TextArea from '../../components/UI/TextArea';
-import { Activity, useData } from '../../contexts/DataContext';
+import { Activity, type LogEntry, useData } from '../../contexts/DataContext';
 import type { LogAttributeValue } from '../../types';
 import {
   combineDateAndTimeToISO,
@@ -27,9 +28,10 @@ type ActivityLogFormProps = {
     attributes?: LogAttributeValue[];
   }) => Promise<void>;
   onClose: () => void;
+  logs: LogEntry[];
 };
 
-const ActivityLogForm = ({ activity, onAddLog, onClose }: ActivityLogFormProps) => {
+const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormProps) => {
   const firefox = isFirefox();
   const initialDate = currentLocalDate();
   const initialTime = currentLocalTime();
@@ -126,6 +128,7 @@ const ActivityLogForm = ({ activity, onAddLog, onClose }: ActivityLogFormProps) 
           required
         />
       </div>
+      <WeeklyActivityOverview activityId={activity.id} logs={logs} />
       <AttributeValuesForm attributes={activity.attributes} drafts={drafts} onChange={setDrafts} />
       <TextArea
         label="Notiz"
@@ -304,6 +307,7 @@ const PwaActivitiesPage = () => {
                   activity={selectedActivity}
                   onAddLog={handleAddLog}
                   onClose={() => setSelectedActivity(null)}
+                  logs={state.logs}
                 />
               </div>
             )}

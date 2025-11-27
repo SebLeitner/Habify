@@ -270,6 +270,7 @@ const PwaLogPage = () => {
             userId: selectedLog.userId,
           }}
           activity={activityById.get(selectedLog.activityId)}
+          logs={state.logs}
           open={!!selectedLog}
           onOpenChange={(open) => {
             if (!open) {
@@ -302,6 +303,7 @@ const PwaLogPage = () => {
                   <div className="space-y-4 pt-4">
                     <LogForm
                       activities={state.activities}
+                      logs={state.logs}
                       initialLog={editingLog}
                       onSubmit={handleUpdateLog}
                       onCancel={() => setEditingLog(null)}

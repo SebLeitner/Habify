@@ -9,15 +9,19 @@ const LogList = ({
   activities,
   onEdit,
   onDelete,
+  allLogs,
 }: {
   logs: LogEntry[];
   activities: Activity[];
   onEdit?: (log: LogEntry) => void;
   onDelete?: (log: LogEntry) => void;
+  allLogs?: LogEntry[];
 }) => {
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
 
   const activityById = useMemo(() => new Map(activities.map((activity) => [activity.id, activity])), [activities]);
+
+  const logsForDetails = allLogs ?? logs;
 
   if (!logs.length) {
     return <p className="text-sm text-slate-400">Noch keine Einträge an diesem Tag.</p>;
@@ -111,6 +115,7 @@ const LogList = ({
         <LogDetailsDialog
           log={selectedLog}
           activity={activityById.get(selectedLog.activityId)}
+          logs={logsForDetails}
           open={!!selectedLog}
           onOpenChange={(open) => {
             if (!open) {
