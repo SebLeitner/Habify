@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -22,11 +22,15 @@ const PwaHighlightsPage = () => {
   const [firefoxDateInput, setFirefoxDateInput] = useState(() => (firefox ? formatDateForDisplay(initialDate) : ''));
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoName, setPhotoName] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHighlightId, setEditingHighlightId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [highlightError, setHighlightError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const highlights = useMemo(
     () =>
@@ -85,6 +89,12 @@ const PwaHighlightsPage = () => {
     setFormError(null);
     setHighlightError(null);
     setEditingHighlightId(null);
+    setPhotoPreview(null);
+    setPhotoName(null);
+    setPhotoError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -101,15 +111,25 @@ const PwaHighlightsPage = () => {
     setIsSubmitting(true);
     try {
       if (editingHighlightId) {
-        await updateHighlight(editingHighlightId, { title: trimmedTitle, text: trimmedText, date });
+        await updateHighlight(editingHighlightId, {
+          title: trimmedTitle,
+          text: trimmedText,
+          date,
+          photoUrl: photoPreview ?? null,
+        });
         setEditingHighlightId(null);
       } else {
-        await addHighlight({ title: trimmedTitle, text: trimmedText, date });
+        await addHighlight({ title: trimmedTitle, text: trimmedText, date, photoUrl: photoPreview ?? null });
       }
       setTitle('');
       setText('');
+      setPhotoPreview(null);
+      setPhotoName(null);
       setIsModalOpen(false);
       setSelectedDate(date);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (submitError) {
       console.error('PWA: Highlight konnte nicht gespeichert werden', submitError);
       const message =
@@ -130,6 +150,11 @@ const PwaHighlightsPage = () => {
     setTitle(highlight.title ?? '');
     setText(highlight.text ?? '');
     setModalDate(highlight.date);
+    setPhotoPreview(highlight.photoUrl ?? null);
+    setPhotoName(highlight.photoUrl ? 'Gespeichertes Foto' : null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setIsModalOpen(true);
   };
 
@@ -169,6 +194,40 @@ const PwaHighlightsPage = () => {
     resetForm();
     setIsModalOpen(true);
     setModalDate(selectedDate);
+  };
+
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setPhotoError(null);
+    const file = event.target.files?.[0];
+    if (!file) {
+      setPhotoPreview(null);
+      setPhotoName(null);
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Bitte wähle eine Bilddatei aus.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPhotoPreview(reader.result);
+        setPhotoName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removePhoto = () => {
+    setPhotoPreview(null);
+    setPhotoName(null);
+    setPhotoError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -232,6 +291,39 @@ const PwaHighlightsPage = () => {
                       rows={3}
                       required
                     />
+                    <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+                      <label className="block text-sm font-medium text-slate-200">
+                        Foto (optional)
+                        <p className="text-xs text-slate-400">Maximal ein Bild pro Highlight.</p>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoChange}
+                          className="mt-1 block w-full text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-brand-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-brand-secondary/90"
+                        />
+                      </label>
+                      {photoName && (
+                        <p className="text-xs text-slate-300">Ausgewählt: {photoName}</p>
+                      )}
+                      {photoPreview && (
+                        <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
+                          <img
+                            src={photoPreview}
+                            alt={title ? `Foto zum Highlight ${title}` : 'Foto zum Highlight'}
+                            className="max-h-64 w-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {photoPreview && (
+                          <Button type="button" variant="ghost" onClick={removePhoto}>
+                            Foto entfernen
+                          </Button>
+                        )}
+                        {photoError && <p className="text-xs text-red-400">{photoError}</p>}
+                      </div>
+                    </div>
                     <div className="flex flex-wrap justify-between gap-2">
                       {editingHighlightId ? (
                         <Button
@@ -347,6 +439,15 @@ const PwaHighlightsPage = () => {
                     </p>
                     <p className="text-sm font-semibold text-white">{highlight.title}</p>
                     <p className="text-sm text-slate-300">{highlight.text}</p>
+                    {highlight.photoUrl && (
+                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
+                        <img
+                          src={highlight.photoUrl}
+                          alt={highlight.title ? `Foto zu ${highlight.title}` : 'Highlight-Foto'}
+                          className="max-h-56 w-full object-cover"
+                        />
+                      </div>
+                    )}
                   </div>
                 </button>
               </li>

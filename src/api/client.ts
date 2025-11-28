@@ -169,6 +169,10 @@ const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
   date: highlight.date,
   title: (highlight.title ?? '').toString(),
   text: (highlight.text ?? '').toString(),
+  photoUrl:
+    highlight.photoUrl === null || highlight.photoUrl === undefined
+      ? null
+      : highlight.photoUrl.toString(),
 });
 
 const extractActivities = (payload: ActivitiesListResponse): Activity[] => {
