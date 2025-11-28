@@ -45,9 +45,20 @@ const DailyHighlights = ({
                 key={highlight.id}
                 className="flex items-start justify-between gap-4 rounded-lg border border-slate-800 bg-slate-900/70 p-4"
               >
-                <div>
-                  <h3 className="text-sm font-semibold text-white">{titleText}</h3>
-                  {showDescription && <p className="mt-1 text-sm text-slate-300">{description}</p>}
+                <div className="flex items-start gap-3">
+                  {highlight.photoUrl && (
+                    <div className="h-16 w-16 overflow-hidden rounded-lg border border-slate-800 bg-slate-950/50">
+                      <img
+                        src={highlight.photoUrl}
+                        alt={titleText ? `Foto zu ${titleText}` : 'Highlight-Foto'}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">{titleText}</h3>
+                    {showDescription && <p className="mt-1 text-sm text-slate-300">{description}</p>}
+                  </div>
                 </div>
                 <Button
                   type="button"

@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import DailyHighlights from '../components/Log/DailyHighlights';
@@ -16,6 +16,9 @@ const HighlightsPage = () => {
   const { state, addHighlight, deleteHighlight, isLoading, error } = useData();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoName, setPhotoName] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const firefox = isFirefox();
   const initialDate = todayAsString();
   const [date, setDate] = useState(initialDate);
@@ -24,6 +27,7 @@ const HighlightsPage = () => {
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { value } = event.target;
@@ -78,9 +82,15 @@ const HighlightsPage = () => {
     setFormError(null);
     setIsSubmitting(true);
     try {
-      await addHighlight({ title: trimmedTitle, text: trimmedText, date });
+      await addHighlight({ title: trimmedTitle, text: trimmedText, date, photoUrl: photoPreview ?? null });
       setTitle('');
       setText('');
+      setPhotoPreview(null);
+      setPhotoName(null);
+      setPhotoError(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -89,6 +99,40 @@ const HighlightsPage = () => {
       setFormError(message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setPhotoError(null);
+    const file = event.target.files?.[0];
+    if (!file) {
+      setPhotoPreview(null);
+      setPhotoName(null);
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Bitte wähle eine Bilddatei aus.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPhotoPreview(reader.result);
+        setPhotoName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removePhoto = () => {
+    setPhotoPreview(null);
+    setPhotoName(null);
+    setPhotoError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -147,6 +191,37 @@ const HighlightsPage = () => {
             rows={4}
             required
           />
+          <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+            <label className="block text-sm font-medium text-slate-200">
+              Foto (optional)
+              <p className="text-xs text-slate-400">Lade ein Bild zu deinem Highlight hoch.</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="mt-1 block w-full text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-brand-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-brand-secondary/90"
+              />
+            </label>
+            {photoName && <p className="text-xs text-slate-300">Ausgewählt: {photoName}</p>}
+            {photoPreview && (
+              <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
+                <img
+                  src={photoPreview}
+                  alt={title ? `Foto zu ${title}` : 'Highlight-Foto'}
+                  className="max-h-64 w-full object-cover"
+                />
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {photoPreview && (
+                <Button type="button" variant="ghost" onClick={removePhoto}>
+                  Foto entfernen
+                </Button>
+              )}
+              {photoError && <p className="text-xs text-red-400">{photoError}</p>}
+            </div>
+          </div>
           {formError && <p className="text-sm text-red-400">{formError}</p>}
           <div className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
