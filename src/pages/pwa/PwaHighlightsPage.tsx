@@ -13,7 +13,7 @@ import {
 import { isFirefox } from '../../utils/browser';
 
 const PwaHighlightsPage = () => {
-  const { state, addHighlight, isLoading, error } = useData();
+  const { state, addHighlight, deleteHighlight, isLoading, error } = useData();
   const firefox = isFirefox();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -24,6 +24,7 @@ const PwaHighlightsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [highlightError, setHighlightError] = useState<string | null>(null);
 
   const highlights = useMemo(
     () =>
@@ -105,6 +106,23 @@ const PwaHighlightsPage = () => {
     }
   };
 
+  const handleHighlightClick = async (highlightId: string) => {
+    const confirmed = window.confirm('lösche bitte Highlights mit bedacht! highlights sind wirchtig!');
+    if (!confirmed) return;
+
+    try {
+      await deleteHighlight(highlightId);
+      setHighlightError(null);
+    } catch (deleteError) {
+      console.error('PWA: Highlight konnte nicht gelöscht werden', deleteError);
+      setHighlightError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : 'Highlight konnte nicht gelöscht werden – bitte versuche es erneut.',
+      );
+    }
+  };
+
   return (
     <div className="space-y-5">
       <header className="flex items-start justify-between gap-3">
@@ -183,6 +201,7 @@ const PwaHighlightsPage = () => {
       </header>
       {error && <p className="text-sm text-red-400">{error}</p>}
       {formError && <p className="text-sm text-red-400">{formError}</p>}
+      {highlightError && <p className="text-sm text-red-400">{highlightError}</p>}
 
       <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
         <div className="flex items-center justify-between gap-3">
@@ -248,18 +267,20 @@ const PwaHighlightsPage = () => {
         ) : (
           <ul className="space-y-2">
             {highlightsForSelectedDay.map((highlight) => (
-              <li
-                key={highlight.id}
-                className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-3"
-              >
-                <div className="flex-1">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    {new Date(highlight.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                  </p>
-                  <p className="text-sm font-semibold text-white">{highlight.title}</p>
-                  <p className="text-sm text-slate-300">{highlight.text}</p>
-                </div>
-                <span className="text-[11px] uppercase tracking-wide text-slate-500">Löschen in der PWA deaktiviert</span>
+              <li key={highlight.id}>
+                <button
+                  type="button"
+                  className="flex w-full items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-3 text-left transition hover:border-slate-700 hover:bg-slate-900"
+                  onClick={() => handleHighlightClick(highlight.id)}
+                >
+                  <div className="flex-1">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      {new Date(highlight.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </p>
+                    <p className="text-sm font-semibold text-white">{highlight.title}</p>
+                    <p className="text-sm text-slate-300">{highlight.text}</p>
+                  </div>
+                </button>
               </li>
             ))}
           </ul>
