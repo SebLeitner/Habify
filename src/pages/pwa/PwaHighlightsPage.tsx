@@ -4,17 +4,20 @@ import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
 import TextArea from '../../components/UI/TextArea';
 import { useData } from '../../contexts/DataContext';
-import { formatDateForDisplay, parseDisplayDateToISO } from '../../utils/datetime';
+import {
+  currentLocalDate,
+  formatDateForDisplay,
+  parseDisplayDateToISO,
+  toLocalDateInput,
+} from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
-
-const today = () => new Date().toISOString().slice(0, 10);
 
 const PwaHighlightsPage = () => {
   const { state, addHighlight, isLoading, error } = useData();
   const firefox = isFirefox();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
-  const initialDate = today();
+  const initialDate = currentLocalDate();
   const [date, setDate] = useState(initialDate);
   const [firefoxDateInput, setFirefoxDateInput] = useState(() => (firefox ? formatDateForDisplay(initialDate) : ''));
   const [formError, setFormError] = useState<string | null>(null);
@@ -37,7 +40,7 @@ const PwaHighlightsPage = () => {
     return Array.from({ length: 7 }, (_, index) => {
       const day = new Date(base);
       day.setDate(base.getDate() - (6 - index));
-      const isoDate = day.toISOString().slice(0, 10);
+      const isoDate = toLocalDateInput(day.toISOString());
       const count = highlights.filter((highlight) => highlight.date === isoDate).length;
 
       return {
