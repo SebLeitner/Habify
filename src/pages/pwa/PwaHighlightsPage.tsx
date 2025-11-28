@@ -13,7 +13,7 @@ import {
 import { isFirefox } from '../../utils/browser';
 
 const PwaHighlightsPage = () => {
-  const { state, addHighlight, deleteHighlight, isLoading, error } = useData();
+  const { state, addHighlight, updateHighlight, deleteHighlight, isLoading, error } = useData();
   const firefox = isFirefox();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -24,6 +24,8 @@ const PwaHighlightsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingHighlightId, setEditingHighlightId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [highlightError, setHighlightError] = useState<string | null>(null);
 
   const highlights = useMemo(
@@ -76,6 +78,15 @@ const PwaHighlightsPage = () => {
     }
   };
 
+  const resetForm = () => {
+    setTitle('');
+    setText('');
+    setModalDate(initialDate);
+    setFormError(null);
+    setHighlightError(null);
+    setEditingHighlightId(null);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedTitle = title.trim();
@@ -89,7 +100,12 @@ const PwaHighlightsPage = () => {
     setFormError(null);
     setIsSubmitting(true);
     try {
-      await addHighlight({ title: trimmedTitle, text: trimmedText, date });
+      if (editingHighlightId) {
+        await updateHighlight(editingHighlightId, { title: trimmedTitle, text: trimmedText, date });
+        setEditingHighlightId(null);
+      } else {
+        await addHighlight({ title: trimmedTitle, text: trimmedText, date });
+      }
       setTitle('');
       setText('');
       setIsModalOpen(false);
@@ -106,13 +122,30 @@ const PwaHighlightsPage = () => {
     }
   };
 
-  const handleHighlightClick = async (highlightId: string) => {
-    const confirmed = window.confirm('lösche bitte Highlights mit bedacht! highlights sind wirchtig!');
+  const handleHighlightClick = (highlightId: string) => {
+    const highlight = highlights.find((item) => item.id === highlightId);
+    if (!highlight) return;
+
+    setEditingHighlightId(highlight.id);
+    setTitle(highlight.title ?? '');
+    setText(highlight.text ?? '');
+    setModalDate(highlight.date);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteCurrentHighlight = async () => {
+    if (!editingHighlightId) return;
+
+    const confirmed = window.confirm('Willst du dieses Highlight wirklich löschen?');
     if (!confirmed) return;
 
+    setIsDeleting(true);
     try {
-      await deleteHighlight(highlightId);
+      await deleteHighlight(editingHighlightId);
       setHighlightError(null);
+      setIsModalOpen(false);
+      setEditingHighlightId(null);
+      resetForm();
     } catch (deleteError) {
       console.error('PWA: Highlight konnte nicht gelöscht werden', deleteError);
       setHighlightError(
@@ -120,7 +153,22 @@ const PwaHighlightsPage = () => {
           ? deleteError.message
           : 'Highlight konnte nicht gelöscht werden – bitte versuche es erneut.',
       );
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      resetForm();
+    }
+    setIsModalOpen(open);
+  };
+
+  const startAddHighlight = () => {
+    resetForm();
+    setIsModalOpen(true);
+    setModalDate(selectedDate);
   };
 
   return (
@@ -133,12 +181,12 @@ const PwaHighlightsPage = () => {
             Halte deine besten Momente fest. Speichern funktioniert nur online.
           </p>
         </div>
-        <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <Dialog.Root open={isModalOpen} onOpenChange={handleOpenChange}>
           <Dialog.Trigger asChild>
             <Button
               variant="secondary"
               className="flex items-center gap-2 whitespace-nowrap"
-              onClick={() => setModalDate(selectedDate)}
+              onClick={startAddHighlight}
             >
               <span className="text-lg">＋</span>
               Neues Highlight
@@ -149,7 +197,9 @@ const PwaHighlightsPage = () => {
             <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl focus:outline-none">
               <div className="flex max-h-[85vh] flex-col">
                 <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4">
-                  <Dialog.Title className="text-lg font-semibold text-white">Highlight hinzufügen</Dialog.Title>
+                  <Dialog.Title className="text-lg font-semibold text-white">
+                    {editingHighlightId ? 'Highlight bearbeiten' : 'Highlight hinzufügen'}
+                  </Dialog.Title>
                   <Dialog.Close asChild>
                     <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-700 hover:text-white">
                       ✕
@@ -182,15 +232,34 @@ const PwaHighlightsPage = () => {
                       rows={3}
                       required
                     />
-                    <div className="flex justify-end gap-2">
-                      <Dialog.Close asChild>
-                        <Button variant="ghost" type="button">
-                          Abbrechen
+                    <div className="flex flex-wrap justify-between gap-2">
+                      {editingHighlightId ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-red-300 hover:text-red-200"
+                          onClick={handleDeleteCurrentHighlight}
+                          disabled={isSubmitting || isDeleting}
+                        >
+                          {isDeleting ? 'Löschen …' : 'Highlight löschen'}
                         </Button>
-                      </Dialog.Close>
-                      <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? 'Speichern …' : 'Highlight sichern'}
-                      </Button>
+                      ) : (
+                        <span />
+                      )}
+                      <div className="flex gap-2">
+                        <Dialog.Close asChild>
+                          <Button variant="ghost" type="button">
+                            Abbrechen
+                          </Button>
+                        </Dialog.Close>
+                        <Button type="submit" disabled={isSubmitting || isDeleting}>
+                          {isSubmitting
+                            ? 'Speichern …'
+                            : editingHighlightId
+                              ? 'Änderungen sichern'
+                              : 'Highlight sichern'}
+                        </Button>
+                      </div>
                     </div>
                   </form>
                 </div>
@@ -252,8 +321,7 @@ const PwaHighlightsPage = () => {
             variant="ghost"
             className="flex items-center gap-2 text-brand-secondary"
             onClick={() => {
-              setModalDate(selectedDate);
-              setIsModalOpen(true);
+              startAddHighlight();
             }}
           >
             <span className="text-lg">＋</span>
