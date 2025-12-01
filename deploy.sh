@@ -4,11 +4,11 @@ set -e
 ### ───────────────────────────────────────────
 ### 1) CONFIG
 ### ───────────────────────────────────────────
-API_URL="https://v2thu7qsrd.execute-api.eu-central-1.amazonaws.com/dev"
+API_URL="https://4cnn2zwtqe.execute-api.eu-central-1.amazonaws.com/dev"
 APP_DOMAIN="habify.leitnersoft.com"
 CLOUDFRONT_URL="d2ufe2249q2zrf.cloudfront.net"
-COGNITO_POOL_ID="eu-central-1_t8xE8WR5L"
-COGNITO_CLIENT_ID="69hbfjjmcjs6438gm0ir2b275s"
+COGNITO_POOL_ID="eu-central-1_CyT2Njhv2"
+COGNITO_CLIENT_ID="1na2a6kp8iuudhllioe7pk5n98"
 
 FRONTEND_DIR="$(pwd)"
 TERRAFORM_DIR="$FRONTEND_DIR/infra/terraform"
