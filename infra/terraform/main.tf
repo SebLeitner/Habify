@@ -503,3 +503,4 @@ output "cognito_user_pool_client_id" {
 output "cognito_domain" {
   value = "https://${aws_cognito_user_pool_domain.habify.domain}.auth.${var.aws_region}.amazoncognito.com"
 }
+

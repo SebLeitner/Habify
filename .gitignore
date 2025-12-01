@@ -4,6 +4,5 @@ node_modules
 /.idea
 .vscode/
 .env*
-terraform.tfstate*
 infra/terraform/.terraform/
 infra/terraform/.terraform-artifacts/
