@@ -203,6 +203,7 @@ const sanitizeHighlight = (item) => ({
   date: item.date,
   title: item.title ?? '',
   text: item.text ?? '',
+  photoUrl: item.photoUrl ?? null,
   userId: item.userId,
   createdAt: item.createdAt ?? new Date().toISOString(),
   updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
@@ -623,6 +624,9 @@ const addHighlight = async (payload) => {
   const userId = payload?.userId?.toString();
   const title = (payload?.title ?? '').toString().trim();
   const text = (payload?.text ?? '').toString().trim();
+  const photoUrl = payload?.photoUrl === undefined || payload?.photoUrl === null
+    ? null
+    : payload.photoUrl.toString();
 
   if (!userId) {
     throw new HttpError(400, 'Benutzer ist erforderlich.');
@@ -645,6 +649,7 @@ const addHighlight = async (payload) => {
     date,
     title,
     text,
+    photoUrl,
     createdAt: now,
     updatedAt: now,
   };
@@ -738,6 +743,13 @@ const updateHighlight = async (payload) => {
       attributeNames['#userId'] = 'userId';
       attributeValues[':userId'] = nextUserId;
     }
+  }
+
+  if (payload?.photoUrl !== undefined) {
+    const nextPhotoUrl = payload.photoUrl === null ? null : payload.photoUrl.toString();
+    expression.push('#photoUrl = :photoUrl');
+    attributeNames['#photoUrl'] = 'photoUrl';
+    attributeValues[':photoUrl'] = nextPhotoUrl;
   }
 
   if (expression.length === 1) {
