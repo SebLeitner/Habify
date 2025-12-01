@@ -1,7 +1,7 @@
 import type { Activity, ActivityAttribute, DailyHighlight, LogAttributeValue, LogEntry } from '../types';
 import { getEnvValue } from '../utils/runtimeEnv';
 
-const DEFAULT_API_BASE = 'https://v2thu7qsrd.execute-api.eu-central-1.amazonaws.com/dev';
+const DEFAULT_API_BASE = 'https://4cnn2zwtqe.execute-api.eu-central-1.amazonaws.com/dev';
 export const API_BASE_URL = (getEnvValue('VITE_API_URL') ?? DEFAULT_API_BASE).replace(/\/$/, '');
 
 type RequestOptions = {
