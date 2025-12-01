@@ -3,14 +3,39 @@ set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <old_user_id> <new_user_id>" >&2
+  echo "Ensure LOGS_TABLE and HIGHLIGHTS_TABLE env vars are set (or defined in .env/.env.local)." >&2
   exit 1
 fi
 
 old_id="$1"
 new_id="$2"
 
-: "${LOGS_TABLE:?LOGS_TABLE environment variable is required}"
-: "${HIGHLIGHTS_TABLE:?HIGHLIGHTS_TABLE environment variable is required}"
+load_env_if_present() {
+  for env_file in .env .env.local; do
+    if [[ -f "$env_file" ]]; then
+      echo "Loading environment from $env_file"
+      # shellcheck disable=SC1090
+      set -a
+      source "$env_file"
+      set +a
+    fi
+  done
+}
+
+require_env() {
+  local var_name="$1"
+  local value
+  value="${!var_name:-}"
+  if [[ -z "$value" ]]; then
+    echo "Error: $var_name environment variable is required. Set it or add it to .env/.env.local." >&2
+    exit 1
+  fi
+}
+
+load_env_if_present
+
+require_env LOGS_TABLE
+require_env HIGHLIGHTS_TABLE
 
 update_highlights() {
   echo "Updating highlights from userId=$old_id to userId=$new_id in $HIGHLIGHTS_TABLE"
@@ -18,7 +43,7 @@ update_highlights() {
   aws dynamodb scan \
     --table-name "$HIGHLIGHTS_TABLE" \
     --filter-expression "#userId = :old" \
-    --expression-attribute-names '{"#userId":"userId"}' \
+    --expression-attribute-names '{"#userId":"userId", "#id":"id"}' \
     --expression-attribute-values '{":old":{"S":"'"$old_id"'"}}' \
     --projection-expression "#id" \
     --output json \
