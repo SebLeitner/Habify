@@ -27,6 +27,7 @@ const ActivityForm = ({
   const [icon, setIcon] = useState(initialActivity?.icon ?? '💧');
   const [color, setColor] = useState(initialActivity?.color ?? defaultColor);
   const [active, setActive] = useState(initialActivity?.active ?? true);
+  const [minLogsPerDay, setMinLogsPerDay] = useState(initialActivity?.minLogsPerDay ?? 0);
   const [categories, setCategories] = useState<string[]>(initialActivity?.categories ?? []);
   const [attributes, setAttributes] = useState<ActivityAttribute[]>(initialActivity?.attributes ?? []);
 
@@ -36,6 +37,7 @@ const ActivityForm = ({
       setIcon(initialActivity.icon);
       setColor(initialActivity.color);
       setActive(initialActivity.active);
+      setMinLogsPerDay(initialActivity.minLogsPerDay ?? 0);
       setCategories(initialActivity.categories ?? []);
       setAttributes(initialActivity.attributes ?? []);
     }
@@ -52,12 +54,13 @@ const ActivityForm = ({
       }))
       .filter((attribute) => attribute.name.length > 0);
 
-    await onSubmit({ name, icon, color, active, categories, attributes: normalizedAttributes });
+    await onSubmit({ name, icon, color, active, minLogsPerDay, categories, attributes: normalizedAttributes });
     if (!initialActivity) {
       setName('');
       setIcon('💧');
       setColor(defaultColor);
       setActive(true);
+      setMinLogsPerDay(0);
       setCategories([]);
       setAttributes([]);
     }
@@ -68,6 +71,15 @@ const ActivityForm = ({
       <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
       <EmojiPicker value={icon} onChange={setIcon} />
       <ColorPicker label="Farbe" value={color} onChange={(event) => setColor(event.target.value)} />
+      <Input
+        label="Tägliches Mindestziel"
+        type="number"
+        min={0}
+        step={1}
+        value={minLogsPerDay}
+        onChange={(event) => setMinLogsPerDay(Number(event.target.value))}
+        helperText="Optional: Wie oft soll die Aktivität pro Tag mindestens geloggt werden?"
+      />
       <TagInput
         label="Kategorien"
         value={categories}

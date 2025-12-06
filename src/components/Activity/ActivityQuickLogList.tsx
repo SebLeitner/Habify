@@ -27,18 +27,23 @@ type ActivityQuickLogListProps = {
   }) => Promise<void>;
   logs: LogEntry[];
   dense?: boolean;
+  dailyTargets?: Map<string, DailyTargetInfo>;
 };
+
+type DailyTargetInfo = { target: number; remaining: number };
 
 const ActivityCard = ({
   activity,
   onAddLog,
   logs,
   dense,
+  dailyTarget,
 }: {
   activity: Activity;
   onAddLog: (values: { activityId: string; timestamp: string; note?: string; attributes?: LogAttributeValue[] }) => Promise<void>;
   logs: LogEntry[];
   dense?: boolean;
+  dailyTarget?: DailyTargetInfo;
 }) => {
   const firefox = isFirefox();
   const initialDate = currentLocalDate();
@@ -172,6 +177,22 @@ const ActivityCard = ({
               {activity.active ? 'Aktiv' : 'Inaktiv'} • Aktualisiert am{' '}
               {new Date(activity.updatedAt).toLocaleDateString('de-DE')}
             </p>
+            {dailyTarget && (
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
+                <span
+                  className={`rounded-full px-2 py-1 ${
+                    dailyTarget.remaining > 0
+                      ? 'bg-slate-800 text-slate-100'
+                      : 'bg-emerald-600/20 text-emerald-200'
+                  }`}
+                >
+                  {dailyTarget.remaining > 0
+                    ? `Heute noch ${dailyTarget.remaining} von ${dailyTarget.target}`
+                    : 'Tagesziel erreicht'}
+                </span>
+              </div>
+            )}
             {activity.categories?.length ? (
               <div className="flex flex-wrap gap-2 pt-1">
                 {activity.categories.map((category) => (
@@ -244,7 +265,7 @@ const ActivityCard = ({
   );
 };
 
-const ActivityQuickLogList = ({ activities, onAddLog, logs, dense = false }: ActivityQuickLogListProps) => {
+const ActivityQuickLogList = ({ activities, onAddLog, logs, dense = false, dailyTargets }: ActivityQuickLogListProps) => {
   const activitiesLogs = useMemo(() => {
     const map = new Map<string, LogEntry[]>();
     activities.forEach((activity) => {
@@ -269,6 +290,7 @@ const ActivityQuickLogList = ({ activities, onAddLog, logs, dense = false }: Act
           logs={activitiesLogs.get(activity.id) ?? []}
           onAddLog={onAddLog}
           dense={dense}
+          dailyTarget={dailyTargets?.get(activity.id)}
         />
       ))}
     </div>

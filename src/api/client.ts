@@ -93,6 +93,10 @@ const normalizeActivity = (activity: Activity): Activity => ({
   categories: Array.isArray(activity.categories)
     ? activity.categories.map((category) => category.toString())
     : [],
+  minLogsPerDay:
+    (activity as Activity).minLogsPerDay === undefined || (activity as Activity).minLogsPerDay === null
+      ? 0
+      : Number((activity as Activity).minLogsPerDay),
   attributes: normalizeAttributes((activity as Activity).attributes),
 });
 
