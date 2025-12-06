@@ -136,6 +136,19 @@ const ensureAttributes = (input) => {
   return normalized;
 };
 
+const ensureMinLogsPerDay = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return 0;
+  }
+
+  const normalized = Number(value);
+  if (Number.isNaN(normalized) || normalized < 0) {
+    throw new HttpError(400, 'Tägliches Mindestziel muss eine Zahl größer oder gleich 0 sein.');
+  }
+
+  return normalized;
+};
+
 const sanitizeActivityAttributes = (input) => {
   if (!Array.isArray(input)) {
     return [];
@@ -182,6 +195,10 @@ const sanitizeActivity = (item) => ({
   icon: item.icon,
   color: item.color,
   active: item.active !== false,
+  minLogsPerDay:
+    item.minLogsPerDay === undefined || item.minLogsPerDay === null
+      ? 0
+      : Number(item.minLogsPerDay),
   categories: Array.isArray(item.categories)
     ? item.categories.map((category) => category.toString())
     : [],
@@ -254,6 +271,7 @@ const addActivity = async (payload) => {
         : payload?.active === 'false'
         ? false
         : true,
+    minLogsPerDay: ensureMinLogsPerDay(payload?.minLogsPerDay),
     categories: ensureCategories(payload?.categories),
     attributes: ensureAttributes(payload?.attributes),
     createdAt: now,
@@ -319,6 +337,12 @@ const updateActivity = async (payload) => {
     expression.push('#attributes = :attributes');
     attributeNames['#attributes'] = 'attributes';
     attributeValues[':attributes'] = ensureAttributes(payload.attributes);
+  }
+
+  if (payload?.minLogsPerDay !== undefined) {
+    expression.push('#minLogsPerDay = :minLogsPerDay');
+    attributeNames['#minLogsPerDay'] = 'minLogsPerDay';
+    attributeValues[':minLogsPerDay'] = ensureMinLogsPerDay(payload.minLogsPerDay);
   }
 
   expression.push('#updatedAt = :updatedAt');
