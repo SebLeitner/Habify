@@ -164,6 +164,46 @@ const PwaActivitiesPage = () => {
     [state.activities],
   );
 
+  const dailyTargets = useMemo(() => {
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+
+    const todayLogs = new Map<string, number>();
+    state.logs.forEach((log) => {
+      const timestamp = new Date(log.timestamp);
+      if (isWithinInterval(timestamp, { start: todayStart, end: todayEnd })) {
+        todayLogs.set(log.activityId, (todayLogs.get(log.activityId) ?? 0) + 1);
+      }
+    });
+
+    const targets = new Map<string, { target: number; remaining: number }>();
+    state.activities.forEach((activity) => {
+      const target = activity.minLogsPerDay ?? 0;
+      if (target <= 0) return;
+      const loggedToday = todayLogs.get(activity.id) ?? 0;
+      targets.set(activity.id, { target, remaining: Math.max(target - loggedToday, 0) });
+    });
+
+    return targets;
+  }, [state.activities, state.logs]);
+
+  const { dailyHabits, regularActivities } = useMemo(() => {
+    const dailyHabitIds = new Set<string>();
+    const daily = activities.filter((activity) => {
+      const target = activity.minLogsPerDay ?? 0;
+      const remaining = dailyTargets.get(activity.id)?.remaining ?? target;
+      const isDaily = target > 0 && remaining > 0;
+      if (isDaily) {
+        dailyHabitIds.add(activity.id);
+      }
+      return isDaily;
+    });
+
+    const regular = activities.filter((activity) => !dailyHabitIds.has(activity.id));
+
+    return { dailyHabits: daily, regularActivities: regular };
+  }, [activities, dailyTargets]);
+
   const activityStats = useMemo(() => {
     const todayStart = startOfDay(new Date());
     const todayEnd = endOfDay(new Date());
@@ -225,56 +265,165 @@ const PwaActivitiesPage = () => {
       ) : activities.length === 0 ? (
         <p className="text-sm text-slate-400">Keine Aktivitäten vorhanden.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {activities.map((activity) => (
-            <div key={activity.id} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
-              <button
-                type="button"
-                onClick={() => setSelectedActivity(activity)}
-                className="flex w-full items-start gap-3 text-left transition hover:text-white"
-              >
-                <span
-                  className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
-                  style={{ backgroundColor: `${activity.color}33` }}
-                >
-                  {activity.icon}
-                </span>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-base font-semibold text-white">{activity.name}</p>
-                    {activity.categories.some((category) => {
-                      const normalized = category.toLowerCase();
-                      return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
-                    }) && (
-                      <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
-                        {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
-                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
-                    </span>
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
-                    </span>
-                  </div>
-                  {activity.categories?.length ? (
-                    <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
-                      {activity.categories.map((category) => (
-                        <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
-                          {category}
+        <div className="space-y-6">
+          {!!dailyHabits.length && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
+                <p className="text-sm text-slate-400">Tägliche Ziele, die du heute noch erfüllen möchtest.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {dailyHabits.map((activity) => {
+                  const dailyTarget = dailyTargets.get(activity.id);
+                  return (
+                    <div
+                      key={activity.id}
+                      className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedActivity(activity)}
+                        className="flex w-full items-start gap-3 text-left transition hover:text-white"
+                      >
+                        <span
+                          className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                          style={{ backgroundColor: `${activity.color}33` }}
+                        >
+                          {activity.icon}
                         </span>
-                      ))}
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-base font-semibold text-white">{activity.name}</p>
+                            {activity.categories.some((category) => {
+                              const normalized = category.toLowerCase();
+                              return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
+                            }) && (
+                              <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
+                                {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
+                          <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                              Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
+                            </span>
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                              Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
+                            </span>
+                          </div>
+                          {dailyTarget && (
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                              <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
+                              <span
+                                className={`rounded-full px-2 py-1 ${
+                                  dailyTarget.remaining > 0
+                                    ? 'bg-slate-800 text-slate-100'
+                                    : 'bg-emerald-600/20 text-emerald-200'
+                                }`}
+                              >
+                                {dailyTarget.remaining > 0
+                                  ? `Heute noch ${dailyTarget.remaining} von ${dailyTarget.target}`
+                                  : 'Tagesziel erreicht'}
+                              </span>
+                            </div>
+                          )}
+                          {activity.categories?.length ? (
+                            <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
+                              {activity.categories.map((category) => (
+                                <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
+                                  {category}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
+                          )}
+                        </div>
+                      </button>
                     </div>
-                  ) : (
-                    <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
-                  )}
-                </div>
-              </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Aktivitäten</h2>
+              <p className="text-sm text-slate-400">Alle aktiven Aktivitäten auf einen Blick.</p>
             </div>
-          ))}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {regularActivities.map((activity) => {
+                const dailyTarget = dailyTargets.get(activity.id);
+                return (
+                  <div key={activity.id} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedActivity(activity)}
+                      className="flex w-full items-start gap-3 text-left transition hover:text-white"
+                    >
+                      <span
+                        className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                        style={{ backgroundColor: `${activity.color}33` }}
+                      >
+                        {activity.icon}
+                      </span>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-base font-semibold text-white">{activity.name}</p>
+                          {activity.categories.some((category) => {
+                            const normalized = category.toLowerCase();
+                            return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
+                          }) && (
+                            <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
+                              {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
+                        <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                          <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                            Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
+                          </span>
+                          <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                            Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
+                          </span>
+                        </div>
+                        {dailyTarget && (
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                            <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
+                            <span
+                              className={`rounded-full px-2 py-1 ${
+                                dailyTarget.remaining > 0
+                                  ? 'bg-slate-800 text-slate-100'
+                                  : 'bg-emerald-600/20 text-emerald-200'
+                              }`}
+                            >
+                              {dailyTarget.remaining > 0
+                                ? `Heute noch ${dailyTarget.remaining} von ${dailyTarget.target}`
+                                : 'Tagesziel erreicht'}
+                            </span>
+                          </div>
+                        )}
+                        {activity.categories?.length ? (
+                          <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
+                            {activity.categories.map((category) => (
+                              <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
+                                {category}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </div>
       )}
 
