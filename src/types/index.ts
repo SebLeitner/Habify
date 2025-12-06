@@ -13,6 +13,7 @@ export type Activity = {
   icon: string;
   color: string;
   active: boolean;
+  minLogsPerDay?: number;
   categories: string[];
   attributes: ActivityAttribute[];
   createdAt: string;
