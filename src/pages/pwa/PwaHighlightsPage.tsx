@@ -11,6 +11,7 @@ import {
   toLocalDateInput,
 } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
+import { buildPdfPages, downloadPdf, wrapText } from '../../utils/pdf';
 
 const PwaHighlightsPage = () => {
   const { state, addHighlight, updateHighlight, deleteHighlight, isLoading, error } = useData();
@@ -30,6 +31,7 @@ const PwaHighlightsPage = () => {
   const [editingHighlightId, setEditingHighlightId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [highlightError, setHighlightError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const highlights = useMemo(
@@ -39,6 +41,21 @@ const PwaHighlightsPage = () => {
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [state.highlights],
   );
+
+  const highlightsByDayAscending = useMemo(() => {
+    const ascending = state.highlights
+      .slice()
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const buckets = new Map<string, typeof ascending>();
+
+    ascending.forEach((item) => {
+      const list = buckets.get(item.date) ?? [];
+      list.push(item);
+      buckets.set(item.date, list);
+    });
+
+    return Array.from(buckets.entries()).map(([isoDate, entries]) => ({ isoDate, entries }));
+  }, [state.highlights]);
 
   const recentDays = useMemo(() => {
     const base = new Date();
@@ -190,6 +207,52 @@ const PwaHighlightsPage = () => {
     setIsModalOpen(open);
   };
 
+  const buildPdfLines = () => {
+    if (!highlightsByDayAscending.length) {
+      return ['Keine Highlights vorhanden.'];
+    }
+
+    const lines: string[] = [];
+
+    highlightsByDayAscending.forEach(({ isoDate, entries }) => {
+      const heading = new Date(isoDate).toLocaleDateString('de-DE', {
+        weekday: 'long',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+      lines.push(heading);
+
+      entries.forEach((entry) => {
+        const content = [entry.title, entry.text].filter(Boolean).join(': ').trim() || 'Highlight ohne Inhalt';
+        const wrapped = wrapText(content, 100);
+        wrapped.forEach((line, index) => {
+          lines.push(index === 0 ? `- ${line}` : `  ${line}`);
+        });
+      });
+
+      lines.push('');
+    });
+
+    return lines;
+  };
+
+  const exportHighlights = () => {
+    try {
+      setExportError(null);
+      const lines = buildPdfLines();
+      const pages = buildPdfPages(lines.length ? lines : ['Keine Highlights vorhanden.']);
+      const filename = `highlights-${new Date().toISOString().slice(0, 10)}.pdf`;
+      downloadPdf(filename, pages.length ? pages : [['Keine Highlights vorhanden.']]);
+    } catch (exportErr) {
+      const message =
+        exportErr instanceof Error
+          ? exportErr.message
+          : 'PDF konnte nicht erstellt werden – bitte versuche es erneut.';
+      setExportError(message);
+    }
+  };
+
   const startAddHighlight = () => {
     resetForm();
     setIsModalOpen(true);
@@ -240,129 +303,135 @@ const PwaHighlightsPage = () => {
             Halte deine besten Momente fest. Speichern funktioniert nur online.
           </p>
         </div>
-        <Dialog.Root open={isModalOpen} onOpenChange={handleOpenChange}>
-          <Dialog.Trigger asChild>
-            <Button
-              variant="secondary"
-              className="flex items-center gap-2 whitespace-nowrap"
-              onClick={startAddHighlight}
-            >
-              <span className="text-lg">＋</span>
-              Neues Highlight
-            </Button>
-          </Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur" />
-            <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl focus:outline-none">
-              <div className="flex max-h-[85vh] flex-col">
-                <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4">
-                  <Dialog.Title className="text-lg font-semibold text-white">
-                    {editingHighlightId ? 'Highlight bearbeiten' : 'Highlight hinzufügen'}
-                  </Dialog.Title>
-                  <Dialog.Close asChild>
-                    <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-700 hover:text-white">
-                      ✕
-                    </button>
-                  </Dialog.Close>
-                </div>
-                <div className="flex-1 overflow-y-auto px-6 pb-6">
-                  <form className="space-y-3 pt-4" onSubmit={handleSubmit}>
-                    <Input label="Titel" value={title} onChange={(event) => setTitle(event.target.value)} required />
-                    <label className="block text-sm font-medium text-slate-200">
-                      Datum
-                      <p className="text-xs text-slate-400">Voreingestellt ist der aktuell gewählte Tag.</p>
-                      <input
-                        type={firefox ? 'text' : 'date'}
-                        lang="de-DE"
-                        inputMode="numeric"
-                        placeholder={firefox ? 'TT.MM.JJJJ' : undefined}
-                        pattern={firefox ? '\\d{2}\\.\\d{2}\\.\\d{4}' : undefined}
-                        value={firefox ? firefoxDateInput : date}
-                        onChange={handleDateChange}
-                        className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
-                        required
-                      />
-                    </label>
-                    <TextArea
-                      label="Beschreibung"
-                      value={text}
-                      onChange={(event) => setText(event.target.value)}
-                      placeholder="Was hat den Tag besonders gemacht?"
-                      rows={3}
-                      required
-                    />
-                    <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" className="whitespace-nowrap" onClick={exportHighlights}>
+            PDF exportieren
+          </Button>
+          <Dialog.Root open={isModalOpen} onOpenChange={handleOpenChange}>
+            <Dialog.Trigger asChild>
+              <Button
+                variant="secondary"
+                className="flex items-center gap-2 whitespace-nowrap"
+                onClick={startAddHighlight}
+              >
+                <span className="text-lg">＋</span>
+                Neues Highlight
+              </Button>
+            </Dialog.Trigger>
+            <Dialog.Portal>
+              <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur" />
+              <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl focus:outline-none">
+                <div className="flex max-h-[85vh] flex-col">
+                  <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-4">
+                    <Dialog.Title className="text-lg font-semibold text-white">
+                      {editingHighlightId ? 'Highlight bearbeiten' : 'Highlight hinzufügen'}
+                    </Dialog.Title>
+                    <Dialog.Close asChild>
+                      <button className="rounded-full border border-transparent p-2 text-slate-400 transition hover:border-slate-700 hover:text-white">
+                        ✕
+                      </button>
+                    </Dialog.Close>
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-6 pb-6">
+                    <form className="space-y-3 pt-4" onSubmit={handleSubmit}>
+                      <Input label="Titel" value={title} onChange={(event) => setTitle(event.target.value)} required />
                       <label className="block text-sm font-medium text-slate-200">
-                        Foto (optional)
-                        <p className="text-xs text-slate-400">Maximal ein Bild pro Highlight.</p>
+                        Datum
+                        <p className="text-xs text-slate-400">Voreingestellt ist der aktuell gewählte Tag.</p>
                         <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoChange}
-                          className="mt-1 block w-full text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-brand-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-brand-secondary/90"
+                          type={firefox ? 'text' : 'date'}
+                          lang="de-DE"
+                          inputMode="numeric"
+                          placeholder={firefox ? 'TT.MM.JJJJ' : undefined}
+                          pattern={firefox ? '\\d{2}\\.\\d{2}\\.\\d{4}' : undefined}
+                          value={firefox ? firefoxDateInput : date}
+                          onChange={handleDateChange}
+                          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-secondary/80 focus:ring-offset-2 focus:ring-offset-slate-900"
+                          required
                         />
                       </label>
-                      {photoName && (
-                        <p className="text-xs text-slate-300">Ausgewählt: {photoName}</p>
-                      )}
-                      {photoPreview && (
-                        <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
-                          <img
-                            src={photoPreview}
-                            alt={title ? `Foto zum Highlight ${title}` : 'Foto zum Highlight'}
-                            className="max-h-64 w-full object-cover"
+                      <TextArea
+                        label="Beschreibung"
+                        value={text}
+                        onChange={(event) => setText(event.target.value)}
+                        placeholder="Was hat den Tag besonders gemacht?"
+                        rows={3}
+                        required
+                      />
+                      <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+                        <label className="block text-sm font-medium text-slate-200">
+                          Foto (optional)
+                          <p className="text-xs text-slate-400">Maximal ein Bild pro Highlight.</p>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoChange}
+                            className="mt-1 block w-full text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-brand-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-brand-secondary/90"
                           />
-                        </div>
-                      )}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {photoPreview && (
-                          <Button type="button" variant="ghost" onClick={removePhoto}>
-                            Foto entfernen
-                          </Button>
+                        </label>
+                        {photoName && (
+                          <p className="text-xs text-slate-300">Ausgewählt: {photoName}</p>
                         )}
-                        {photoError && <p className="text-xs text-red-400">{photoError}</p>}
+                        {photoPreview && (
+                          <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
+                            <img
+                              src={photoPreview}
+                              alt={title ? `Foto zum Highlight ${title}` : 'Foto zum Highlight'}
+                              className="max-h-64 w-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {photoPreview && (
+                            <Button type="button" variant="ghost" onClick={removePhoto}>
+                              Foto entfernen
+                            </Button>
+                          )}
+                          {photoError && <p className="text-xs text-red-400">{photoError}</p>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap justify-between gap-2">
-                      {editingHighlightId ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="text-red-300 hover:text-red-200"
-                          onClick={handleDeleteCurrentHighlight}
-                          disabled={isSubmitting || isDeleting}
-                        >
-                          {isDeleting ? 'Löschen …' : 'Highlight löschen'}
-                        </Button>
-                      ) : (
-                        <span />
-                      )}
-                      <div className="flex gap-2">
-                        <Dialog.Close asChild>
-                          <Button variant="ghost" type="button">
-                            Abbrechen
+                      <div className="flex flex-wrap justify-between gap-2">
+                        {editingHighlightId ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-red-300 hover:text-red-200"
+                            onClick={handleDeleteCurrentHighlight}
+                            disabled={isSubmitting || isDeleting}
+                          >
+                            {isDeleting ? 'Löschen …' : 'Highlight löschen'}
                           </Button>
-                        </Dialog.Close>
-                        <Button type="submit" disabled={isSubmitting || isDeleting}>
-                          {isSubmitting
-                            ? 'Speichern …'
-                            : editingHighlightId
-                              ? 'Änderungen sichern'
-                              : 'Highlight sichern'}
-                        </Button>
+                        ) : (
+                          <span />
+                        )}
+                        <div className="flex gap-2">
+                          <Dialog.Close asChild>
+                            <Button variant="ghost" type="button">
+                              Abbrechen
+                            </Button>
+                          </Dialog.Close>
+                          <Button type="submit" disabled={isSubmitting || isDeleting}>
+                            {isSubmitting
+                              ? 'Speichern …'
+                              : editingHighlightId
+                                ? 'Änderungen sichern'
+                                : 'Highlight sichern'}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </form>
+                    </form>
+                  </div>
                 </div>
-              </div>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
+        </div>
       </header>
       {error && <p className="text-sm text-red-400">{error}</p>}
       {formError && <p className="text-sm text-red-400">{formError}</p>}
       {highlightError && <p className="text-sm text-red-400">{highlightError}</p>}
+      {exportError && <p className="text-sm text-red-400">{exportError}</p>}
 
       <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
         <div className="flex items-center justify-between gap-3">
