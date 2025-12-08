@@ -11,7 +11,7 @@ import {
   toLocalDateInput,
 } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
-import { buildPdfPages, downloadPdf, wrapText } from '../../utils/pdf';
+import { buildPdfPages, createCoverPage, downloadPdf, wrapText } from '../../utils/pdf';
 
 const PwaHighlightsPage = () => {
   const { state, addHighlight, updateHighlight, deleteHighlight, isLoading, error } = useData();
@@ -237,13 +237,34 @@ const PwaHighlightsPage = () => {
     return lines;
   };
 
+  const buildCoverPage = () => {
+    if (!highlightsByDayAscending.length) {
+      return null;
+    }
+
+    const firstDay = new Date(highlightsByDayAscending[0].isoDate);
+    const lastDay = new Date(highlightsByDayAscending[highlightsByDayAscending.length - 1].isoDate);
+
+    const formatDay = (date: Date) =>
+      date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    return createCoverPage({
+      title: 'Highlights',
+      note: 'Nur für des Autors Augen gedacht',
+      period: `Zeitraum: ${formatDay(firstDay)} – ${formatDay(lastDay)}`,
+      summary: `Gesamt: ${state.highlights.length} Highlight${state.highlights.length === 1 ? '' : 's'}`,
+    });
+  };
+
   const exportHighlights = () => {
     try {
       setExportError(null);
       const lines = buildPdfLines();
       const pages = buildPdfPages(lines.length ? lines : ['Keine Highlights vorhanden.']);
+      const coverPage = buildCoverPage();
+      const pdfPages = coverPage ? [coverPage, ...pages] : pages;
       const filename = `highlights-${new Date().toISOString().slice(0, 10)}.pdf`;
-      downloadPdf(filename, pages.length ? pages : [['Keine Highlights vorhanden.']]);
+      downloadPdf(filename, pdfPages.length ? pdfPages : [['Keine Highlights vorhanden.']]);
     } catch (exportErr) {
       const message =
         exportErr instanceof Error
