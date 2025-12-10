@@ -267,27 +267,11 @@ const PwaActivitiesPage = () => {
     }
   };
 
-  const handleDismissDailyHabit = async (activity: Activity, timeframeLabel: string) => {
-    setActionError(null);
-    try {
-      await addLog({
-        activityId: activity.id,
-        timestamp: combineDateAndTimeToISO(currentLocalDate(), currentLocalTime()),
-        note: `Nicht erfüllt (${timeframeLabel})`,
-      });
-    } catch (apiError) {
-      console.error('PWA: Daily Habit konnte nicht verworfen werden', apiError);
-      setActionError('Speichern nicht möglich – bitte stelle die Verbindung zum Backend sicher.');
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Start</p>
-          <h1 className="text-xl font-semibold text-white">Aktivitäten</h1>
-          <p className="text-sm text-slate-400">Tippe eine Aktivität an, um schnell einen Eintrag zu erstellen.</p>
+          <h1 className="text-xl font-semibold text-white">Main Quest</h1>
         </div>
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
@@ -403,13 +387,6 @@ const PwaActivitiesPage = () => {
                                   )}
                                 </div>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDismissDailyHabit(activity, section.title)}
-                                className="self-start rounded-lg border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-700 hover:bg-slate-800"
-                              >
-                                Dismiss
-                              </button>
                             </div>
                           </div>
                         );
@@ -422,8 +399,8 @@ const PwaActivitiesPage = () => {
 
           <section className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Aktivitäten</h2>
-              <p className="text-sm text-slate-400">Alle aktiven Aktivitäten auf einen Blick.</p>
+              <h2 className="text-lg font-semibold text-white">Flex Habits</h2>
+              <p className="text-sm text-slate-400">Alle flexiblen Habits auf einen Blick.</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {regularActivities.map((activity) => {
