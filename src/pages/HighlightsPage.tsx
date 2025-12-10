@@ -13,7 +13,7 @@ import { isFirefox } from '../utils/browser';
 const todayAsString = () => format(new Date(), 'yyyy-MM-dd');
 
 const HighlightsPage = () => {
-  const { state, addHighlight, deleteHighlight, isLoading, error } = useData();
+  const { state, addHighlight, deleteHighlight, updateHighlight, isLoading, error } = useData();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -27,7 +27,25 @@ const HighlightsPage = () => {
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingHighlightId, setEditingHighlightId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const resetForm = (nextDate = date) => {
+    setTitle('');
+    setText('');
+    setPhotoPreview(null);
+    setPhotoName(null);
+    setPhotoError(null);
+    setEditingHighlightId(null);
+    setFormError(null);
+    setDate(nextDate);
+    if (firefox) {
+      setFirefoxDateInput(formatDateForDisplay(nextDate));
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { value } = event.target;
@@ -82,15 +100,17 @@ const HighlightsPage = () => {
     setFormError(null);
     setIsSubmitting(true);
     try {
-      await addHighlight({ title: trimmedTitle, text: trimmedText, date, photoUrl: photoPreview ?? null });
-      setTitle('');
-      setText('');
-      setPhotoPreview(null);
-      setPhotoName(null);
-      setPhotoError(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      if (editingHighlightId) {
+        await updateHighlight(editingHighlightId, {
+          title: trimmedTitle,
+          text: trimmedText,
+          date,
+          photoUrl: photoPreview ?? null,
+        });
+      } else {
+        await addHighlight({ title: trimmedTitle, text: trimmedText, date, photoUrl: photoPreview ?? null });
       }
+      resetForm();
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -136,6 +156,27 @@ const HighlightsPage = () => {
     }
   };
 
+  const startEditing = (highlight: DailyHighlight) => {
+    setFormError(null);
+    setPhotoError(null);
+    setEditingHighlightId(highlight.id);
+    setTitle(highlight.title ?? '');
+    setText(highlight.text ?? '');
+    setDate(highlight.date);
+    if (firefox) {
+      setFirefoxDateInput(formatDateForDisplay(highlight.date));
+    }
+    setPhotoPreview(highlight.photoUrl ?? null);
+    setPhotoName(highlight.photoUrl ? 'Gespeichertes Foto' : null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCancelEdit = () => {
+    resetForm();
+  };
+
   const handleDeleteHighlight = async (highlight: DailyHighlight) => {
     setFormError(null);
     try {
@@ -160,7 +201,21 @@ const HighlightsPage = () => {
       </header>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-        <h2 className="text-lg font-semibold text-white">Neues Highlight festhalten</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-white">
+            {editingHighlightId ? 'Highlight anpassen' : 'Neues Highlight festhalten'}
+          </h2>
+          {editingHighlightId && (
+            <Button type="button" variant="ghost" onClick={handleCancelEdit}>
+              Abbrechen
+            </Button>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-400">
+          {editingHighlightId
+            ? 'Passe den Beschreibungstext oder das Bild an – die Überschrift bleibt erhalten, wenn du sie nicht änderst.'
+            : 'Sammle Highlights und ergänze den Beschreibungstext bei Bedarf auch nachträglich.'}
+        </p>
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
           <Input
             label="Titel"
@@ -225,7 +280,11 @@ const HighlightsPage = () => {
           {formError && <p className="text-sm text-red-400">{formError}</p>}
           <div className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Speichern…' : 'Highlight hinzufügen'}
+              {isSubmitting
+                ? 'Speichern…'
+                : editingHighlightId
+                  ? 'Änderungen sichern'
+                  : 'Highlight hinzufügen'}
             </Button>
           </div>
         </form>
@@ -245,6 +304,7 @@ const HighlightsPage = () => {
                 key={highlightDate}
                 highlights={items}
                 onDelete={handleDeleteHighlight}
+                onEdit={startEditing}
                 title={`Highlights – ${heading}`}
               />
             );

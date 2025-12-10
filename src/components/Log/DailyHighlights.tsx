@@ -5,12 +5,14 @@ import Button from '../UI/Button';
 const DailyHighlights = ({
   highlights,
   onDelete,
+  onEdit,
   title = 'Highlights des Tages',
   emptyLabel = 'Noch keine Highlights für diesen Tag.',
   error,
 }: {
   highlights: DailyHighlight[];
   onDelete: (highlight: DailyHighlight) => Promise<void> | void;
+  onEdit?: (highlight: DailyHighlight) => void;
   title?: string;
   emptyLabel?: string;
   error?: string | null;
@@ -39,7 +41,7 @@ const DailyHighlights = ({
           highlights.map((highlight) => {
             const titleText = highlight.title?.trim() || highlight.text || 'Highlight';
             const description = highlight.text?.trim() ?? '';
-            const showDescription = Boolean(description && description !== titleText);
+            const showDescription = Boolean(description);
             return (
               <div
                 key={highlight.id}
@@ -58,6 +60,13 @@ const DailyHighlights = ({
                   <div>
                     <h3 className="text-sm font-semibold text-white">{titleText}</h3>
                     {showDescription && <p className="mt-1 text-sm text-slate-300">{description}</p>}
+                    {onEdit && (
+                      <div className="mt-2">
+                        <Button type="button" variant="secondary" onClick={() => onEdit(highlight)}>
+                          Text bearbeiten
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <Button

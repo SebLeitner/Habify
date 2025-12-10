@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -33,6 +33,7 @@ const PwaHighlightsPage = () => {
   const [highlightError, setHighlightError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const highlights = useMemo(
     () =>
@@ -207,6 +208,13 @@ const PwaHighlightsPage = () => {
     setIsModalOpen(open);
   };
 
+  useEffect(() => {
+    if (isModalOpen && editingHighlightId && textAreaRef.current) {
+      textAreaRef.current.focus({ preventScroll: true });
+      textAreaRef.current.selectionStart = textAreaRef.current.value.length;
+    }
+  }, [isModalOpen, editingHighlightId]);
+
   const buildPdfLines = () => {
     if (!highlightsByDayAscending.length) {
       return ['Keine Highlights vorhanden.'];
@@ -377,6 +385,7 @@ const PwaHighlightsPage = () => {
                         onChange={(event) => setText(event.target.value)}
                         placeholder="Was hat den Tag besonders gemacht?"
                         rows={3}
+                        ref={textAreaRef}
                         required
                       />
                       <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
@@ -518,10 +527,17 @@ const PwaHighlightsPage = () => {
           <ul className="space-y-2">
             {highlightsForSelectedDay.map((highlight) => (
               <li key={highlight.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-3 text-left transition hover:border-slate-700 hover:bg-slate-900"
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="flex w-full items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-3 text-left transition hover:-translate-y-[1px] hover:border-slate-700 hover:bg-slate-900"
                   onClick={() => handleHighlightClick(highlight.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleHighlightClick(highlight.id);
+                    }
+                  }}
                 >
                   <div className="flex-1">
                     <p className="text-xs uppercase tracking-wide text-slate-400">
@@ -529,6 +545,18 @@ const PwaHighlightsPage = () => {
                     </p>
                     <p className="text-sm font-semibold text-white">{highlight.title}</p>
                     <p className="text-sm text-slate-300">{highlight.text}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        className="px-3 py-1 text-xs"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleHighlightClick(highlight.id);
+                        }}
+                      >
+                        Text bearbeiten
+                      </Button>
+                    </div>
                     {highlight.photoUrl && (
                       <div className="mt-3 overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
                         <img
@@ -539,7 +567,7 @@ const PwaHighlightsPage = () => {
                       </div>
                     )}
                   </div>
-                </button>
+                </div>
               </li>
             ))}
           </ul>
