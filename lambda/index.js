@@ -208,10 +208,7 @@ const sanitizeActivity = (item) => ({
   icon: item.icon,
   color: item.color,
   active: item.active !== false,
-  minLogsPerDay:
-    item.minLogsPerDay === undefined || item.minLogsPerDay === null
-      ? 0
-      : Number(item.minLogsPerDay),
+  minLogsPerDay: ensureMinLogsPerDay(item.minLogsPerDay),
   categories: Array.isArray(item.categories)
     ? item.categories.map((category) => category.toString())
     : [],
