@@ -16,7 +16,7 @@ const PwaLayout = () => {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Habify App</p>
-            <p className="text-lg font-semibold text-white">Kompakte PWA-Ansicht</p>
+            <p className="text-lg font-semibold text-white">Aus Momenten werden Wege.</p>
           </div>
           <div className="rounded-full bg-brand-primary/15 px-3 py-1 text-xs font-semibold text-brand-secondary">
             app.habify.leitnersoft.com
