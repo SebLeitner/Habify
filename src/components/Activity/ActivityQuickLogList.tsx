@@ -16,6 +16,7 @@ import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from
 import type { LogAttributeValue } from '../../types';
 import { isFirefox } from '../../utils/browser';
 import WeeklyActivityOverview from '../Log/WeeklyActivityOverview';
+import type { DailyHabitTargets } from '../../types';
 
 type ActivityQuickLogListProps = {
   activities: Activity[];
@@ -30,7 +31,12 @@ type ActivityQuickLogListProps = {
   dailyTargets?: Map<string, DailyTargetInfo>;
 };
 
-type DailyTargetInfo = { target: number; remaining: number };
+type DailyTargetInfo = {
+  target: DailyHabitTargets;
+  remaining: DailyHabitTargets;
+  totalTarget: number;
+  totalRemaining: number;
+};
 
 const ActivityCard = ({
   activity,
@@ -178,19 +184,38 @@ const ActivityCard = ({
               {new Date(activity.updatedAt).toLocaleDateString('de-DE')}
             </p>
             {dailyTarget && (
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
-                <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
-                <span
-                  className={`rounded-full px-2 py-1 ${
-                    dailyTarget.remaining > 0
-                      ? 'bg-slate-800 text-slate-100'
-                      : 'bg-emerald-600/20 text-emerald-200'
-                  }`}
-                >
-                  {dailyTarget.remaining > 0
-                    ? `Heute noch ${dailyTarget.remaining} von ${dailyTarget.target}`
-                    : 'Tagesziel erreicht'}
-                </span>
+              <div className="space-y-1 text-[11px] font-semibold">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
+                  <span
+                    className={`rounded-full px-2 py-1 ${
+                      dailyTarget.totalRemaining > 0
+                        ? 'bg-slate-800 text-slate-100'
+                        : 'bg-emerald-600/20 text-emerald-200'
+                    }`}
+                  >
+                    {dailyTarget.totalRemaining > 0
+                      ? `Heute noch ${dailyTarget.totalRemaining} von ${dailyTarget.totalTarget}`
+                      : 'Tagesziel erreicht'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
+                  {dailyTarget.target.morning > 0 && (
+                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                      Morgens: {dailyTarget.remaining.morning}/{dailyTarget.target.morning}
+                    </span>
+                  )}
+                  {dailyTarget.target.day > 0 && (
+                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                      Tag: {dailyTarget.remaining.day}/{dailyTarget.target.day}
+                    </span>
+                  )}
+                  {dailyTarget.target.evening > 0 && (
+                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                      Abend: {dailyTarget.remaining.evening}/{dailyTarget.target.evening}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
             {activity.categories?.length ? (

@@ -3,6 +3,18 @@ import { endOfDay, isWithinInterval, startOfDay } from 'date-fns';
 import ActivityQuickLogList from '../components/Activity/ActivityQuickLogList';
 import Spinner from '../components/UI/Spinner';
 import { useData } from '../contexts/DataContext';
+import {
+  calculateRemainingTargets,
+  normalizeDailyHabitTargets,
+  sumDailyHabitTargets,
+} from '../utils/dailyHabitTargets';
+
+type DailyTargetInfo = {
+  target: ReturnType<typeof normalizeDailyHabitTargets>;
+  remaining: ReturnType<typeof normalizeDailyHabitTargets>;
+  totalTarget: number;
+  totalRemaining: number;
+};
 
 const ActivitiesPage = () => {
   const { state, addLog, isLoading, error } = useData();
@@ -29,12 +41,19 @@ const ActivitiesPage = () => {
       }
     });
 
-    const targets = new Map<string, { target: number; remaining: number }>();
+    const targets = new Map<string, DailyTargetInfo>();
     state.activities.forEach((activity) => {
-      const target = activity.minLogsPerDay ?? 0;
-      if (target <= 0) return;
+      const target = normalizeDailyHabitTargets(activity.minLogsPerDay);
+      const totalTarget = sumDailyHabitTargets(target);
+      if (totalTarget <= 0) return;
       const loggedToday = todayLogs.get(activity.id) ?? 0;
-      targets.set(activity.id, { target, remaining: Math.max(target - loggedToday, 0) });
+      const remaining = calculateRemainingTargets(target, loggedToday);
+      targets.set(activity.id, {
+        target,
+        remaining,
+        totalTarget,
+        totalRemaining: sumDailyHabitTargets(remaining),
+      });
     });
 
     return targets;
@@ -53,9 +72,8 @@ const ActivitiesPage = () => {
   const { dailyHabits, regularActivities } = useMemo(() => {
     const dailyHabitIds = new Set<string>();
     const daily = activities.filter((activity) => {
-      const target = activity.minLogsPerDay ?? 0;
-      const remaining = dailyTargets.get(activity.id)?.remaining ?? target;
-      const isDaily = target > 0 && remaining > 0;
+      const target = dailyTargets.get(activity.id);
+      const isDaily = (target?.totalTarget ?? 0) > 0 && (target?.totalRemaining ?? 0) > 0;
       if (isDaily) {
         dailyHabitIds.add(activity.id);
       }
@@ -68,6 +86,9 @@ const ActivitiesPage = () => {
   }, [activities, dailyTargets]);
 
   const showRegularSection = regularActivities.length > 0 || dailyHabits.length === 0;
+  const morningHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.morning ?? 0) > 0);
+  const dayHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.day ?? 0) > 0);
+  const eveningHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.evening ?? 0) > 0);
   const emptyMessage = state.activities.length
     ? 'Keine Aktivitäten passen zu deiner Suche.'
     : 'Noch keine Aktivitäten angelegt.';
@@ -119,18 +140,36 @@ const ActivitiesPage = () => {
       ) : (
         <div className="space-y-6">
           {!!dailyHabits.length && (
-            <section className="space-y-3">
+            <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
-                <p className="text-sm text-slate-400">Tägliche Ziele, die du heute noch erfüllen möchtest.</p>
+                <p className="text-sm text-slate-400">Morgens, tagsüber und abends abhaken.</p>
               </div>
-              <ActivityQuickLogList
-                activities={dailyHabits}
-                logs={state.logs}
-                onAddLog={addLog}
-                dense
-                dailyTargets={dailyTargets}
-              />
+              <div className="space-y-5">
+                {[
+                  { key: 'morning', title: 'Morgens', activities: morningHabits },
+                  { key: 'day', title: 'Tag', activities: dayHabits },
+                  { key: 'evening', title: 'Abend', activities: eveningHabits },
+                ]
+                  .filter((section) => section.activities.length > 0)
+                  .map((section) => (
+                    <div key={section.key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-200">{section.title}</h3>
+                        <span className="text-xs text-slate-400">
+                          {section.activities.length} Habit{section.activities.length === 1 ? '' : 's'} offen
+                        </span>
+                      </div>
+                      <ActivityQuickLogList
+                        activities={section.activities}
+                        logs={state.logs}
+                        onAddLog={addLog}
+                        dense
+                        dailyTargets={dailyTargets}
+                      />
+                    </div>
+                  ))}
+              </div>
             </section>
           )}
           {showRegularSection && (

@@ -7,13 +7,19 @@ export type ActivityAttribute = {
   unit?: string | null;
 };
 
+export type DailyHabitTargets = {
+  morning: number;
+  day: number;
+  evening: number;
+};
+
 export type Activity = {
   id: string;
   name: string;
   icon: string;
   color: string;
   active: boolean;
-  minLogsPerDay?: number;
+  minLogsPerDay?: DailyHabitTargets;
   categories: string[];
   attributes: ActivityAttribute[];
   createdAt: string;

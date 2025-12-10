@@ -136,7 +136,7 @@ const ensureAttributes = (input) => {
   return normalized;
 };
 
-const ensureMinLogsPerDay = (value) => {
+const normalizeDailyTargetNumber = (value) => {
   if (value === undefined || value === null || value === '') {
     return 0;
   }
@@ -147,6 +147,19 @@ const ensureMinLogsPerDay = (value) => {
   }
 
   return normalized;
+};
+
+const ensureMinLogsPerDay = (value) => {
+  if (value && typeof value === 'object') {
+    return {
+      morning: normalizeDailyTargetNumber(value.morning),
+      day: normalizeDailyTargetNumber(value.day),
+      evening: normalizeDailyTargetNumber(value.evening),
+    };
+  }
+
+  const normalized = normalizeDailyTargetNumber(value);
+  return { morning: normalized, day: 0, evening: 0 };
 };
 
 const sanitizeActivityAttributes = (input) => {

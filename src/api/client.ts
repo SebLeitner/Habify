@@ -1,4 +1,5 @@
 import type { Activity, ActivityAttribute, DailyHighlight, LogAttributeValue, LogEntry } from '../types';
+import { normalizeDailyHabitTargets } from '../utils/dailyHabitTargets';
 import { getEnvValue } from '../utils/runtimeEnv';
 
 const DEFAULT_API_BASE = 'https://4cnn2zwtqe.execute-api.eu-central-1.amazonaws.com/dev';
@@ -93,10 +94,7 @@ const normalizeActivity = (activity: Activity): Activity => ({
   categories: Array.isArray(activity.categories)
     ? activity.categories.map((category) => category.toString())
     : [],
-  minLogsPerDay:
-    (activity as Activity).minLogsPerDay === undefined || (activity as Activity).minLogsPerDay === null
-      ? 0
-      : Number((activity as Activity).minLogsPerDay),
+  minLogsPerDay: normalizeDailyHabitTargets((activity as Activity).minLogsPerDay),
   attributes: normalizeAttributes((activity as Activity).attributes),
 });
 
