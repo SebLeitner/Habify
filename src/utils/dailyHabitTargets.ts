@@ -20,6 +20,22 @@ const normalizeValue = (value: unknown): number => {
 };
 
 export const normalizeDailyHabitTargets = (value: unknown): DailyHabitTargets => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return { ...defaultDailyHabitTargets };
+
+    try {
+      return normalizeDailyHabitTargets(JSON.parse(trimmed));
+    } catch (error) {
+      const numericValue = Number(trimmed);
+      if (!Number.isNaN(numericValue)) {
+        return normalizeDailyHabitTargets(numericValue);
+      }
+
+      console.warn('Unsupported daily habit target value received', value, error);
+    }
+  }
+
   if (typeof value === 'number') {
     return {
       morning: normalizeValue(value),
