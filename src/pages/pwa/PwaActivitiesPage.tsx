@@ -1,7 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
 import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
-import AttributeValuesForm from '../../components/Log/AttributeValuesForm';
 import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -16,7 +15,6 @@ import {
   parseDisplayDateToISO,
   parseDisplayTimeToISO,
 } from '../../utils/datetime';
-import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 import { isFirefox } from '../../utils/browser';
 import { calculateRemainingTargets, normalizeDailyHabitTargets, sumDailyHabitTargets } from '../../utils/dailyHabitTargets';
 
@@ -52,13 +50,11 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<AttributeValueDraft[]>(() => emptyDrafts(activity.attributes));
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
     try {
-      const attributeValues = serializeDrafts(drafts);
       if (!date || !time) {
         throw new Error('Bitte Datum und Uhrzeit auswählen.');
       }
@@ -67,7 +63,6 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
         activityId: activity.id,
         timestamp: combineDateAndTimeToISO(date, time),
         note: note.trim() ? note.trim() : undefined,
-        attributes: attributeValues.length ? attributeValues : undefined,
       });
       const resetDate = currentLocalDate();
       const resetTime = currentLocalTime();
@@ -77,7 +72,6 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
         setFirefoxDateInput(formatDateForDisplay(resetDate));
         setFirefoxTimeInput(resetTime);
       }
-      setDrafts(toDrafts(activity.attributes));
       setNote('');
       setError(null);
       onClose();
@@ -137,7 +131,6 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
         />
       </div>
       <WeeklyActivityOverview activityId={activity.id} logs={logs} />
-      <AttributeValuesForm attributes={activity.attributes} drafts={drafts} onChange={setDrafts} />
       <TextArea
         label="Notiz"
         value={note}
@@ -336,7 +329,7 @@ const PwaActivitiesPage = () => {
                                       Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
                                     </span>
                                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                      Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
+                                      7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
                                     </span>
                                   </div>
                                   {dailyTarget && (
@@ -436,7 +429,7 @@ const PwaActivitiesPage = () => {
                             Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
                           </span>
                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                            Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
+                            7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
                           </span>
                         </div>
                         {dailyTarget && (
@@ -510,9 +503,6 @@ const PwaActivitiesPage = () => {
                   </span>
                   <div>
                     <Dialog.Title className="text-lg font-semibold text-white">{selectedActivity.name}</Dialog.Title>
-                    <Dialog.Description className="text-sm text-slate-400">
-                      Schneller Eintrag – direkte Verbindung zum Backend erforderlich.
-                    </Dialog.Description>
                   </div>
                   <Dialog.Close asChild>
                     <button className="ml-auto rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
