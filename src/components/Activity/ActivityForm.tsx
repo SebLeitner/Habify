@@ -6,7 +6,8 @@ import EmojiPicker from '../UI/EmojiPicker';
 import { Activity } from '../../contexts/DataContext';
 import TagInput from '../UI/TagInput';
 import ActivityAttributesEditor from './ActivityAttributesEditor';
-import type { ActivityAttribute } from '../../types';
+import type { ActivityAttribute, DailyHabitTargets } from '../../types';
+import { defaultDailyHabitTargets, normalizeDailyHabitTargets } from '../../utils/dailyHabitTargets';
 
 const defaultColor = '#4f46e5';
 
@@ -27,7 +28,9 @@ const ActivityForm = ({
   const [icon, setIcon] = useState(initialActivity?.icon ?? '💧');
   const [color, setColor] = useState(initialActivity?.color ?? defaultColor);
   const [active, setActive] = useState(initialActivity?.active ?? true);
-  const [minLogsPerDay, setMinLogsPerDay] = useState(initialActivity?.minLogsPerDay ?? 0);
+  const [minLogsPerDay, setMinLogsPerDay] = useState<DailyHabitTargets>(() =>
+    normalizeDailyHabitTargets(initialActivity?.minLogsPerDay),
+  );
   const [categories, setCategories] = useState<string[]>(initialActivity?.categories ?? []);
   const [attributes, setAttributes] = useState<ActivityAttribute[]>(initialActivity?.attributes ?? []);
 
@@ -37,7 +40,7 @@ const ActivityForm = ({
       setIcon(initialActivity.icon);
       setColor(initialActivity.color);
       setActive(initialActivity.active);
-      setMinLogsPerDay(initialActivity.minLogsPerDay ?? 0);
+      setMinLogsPerDay(normalizeDailyHabitTargets(initialActivity.minLogsPerDay));
       setCategories(initialActivity.categories ?? []);
       setAttributes(initialActivity.attributes ?? []);
     }
@@ -60,7 +63,7 @@ const ActivityForm = ({
       setIcon('💧');
       setColor(defaultColor);
       setActive(true);
-      setMinLogsPerDay(0);
+      setMinLogsPerDay({ ...defaultDailyHabitTargets });
       setCategories([]);
       setAttributes([]);
     }
@@ -71,15 +74,41 @@ const ActivityForm = ({
       <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
       <EmojiPicker value={icon} onChange={setIcon} />
       <ColorPicker label="Farbe" value={color} onChange={(event) => setColor(event.target.value)} />
-      <Input
-        label="Tägliches Mindestziel"
-        type="number"
-        min={0}
-        step={1}
-        value={minLogsPerDay}
-        onChange={(event) => setMinLogsPerDay(Number(event.target.value))}
-        helperText="Optional: Wie oft soll die Aktivität pro Tag mindestens geloggt werden?"
-      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Input
+          label="Morgens (Daily Habit)"
+          type="number"
+          min={0}
+          step={1}
+          value={minLogsPerDay.morning}
+          onChange={(event) =>
+            setMinLogsPerDay((current) => ({ ...current, morning: Number(event.target.value) }))
+          }
+          helperText="Wie oft soll die Aktivität morgens geloggt werden?"
+        />
+        <Input
+          label="Tag"
+          type="number"
+          min={0}
+          step={1}
+          value={minLogsPerDay.day}
+          onChange={(event) =>
+            setMinLogsPerDay((current) => ({ ...current, day: Number(event.target.value) }))
+          }
+          helperText="Wie oft soll die Aktivität tagsüber geloggt werden?"
+        />
+        <Input
+          label="Abend"
+          type="number"
+          min={0}
+          step={1}
+          value={minLogsPerDay.evening}
+          onChange={(event) =>
+            setMinLogsPerDay((current) => ({ ...current, evening: Number(event.target.value) }))
+          }
+          helperText="Wie oft soll die Aktivität abends geloggt werden?"
+        />
+      </div>
       <TagInput
         label="Kategorien"
         value={categories}

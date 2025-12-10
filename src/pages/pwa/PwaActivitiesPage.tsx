@@ -18,6 +18,14 @@ import {
 } from '../../utils/datetime';
 import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 import { isFirefox } from '../../utils/browser';
+import { calculateRemainingTargets, normalizeDailyHabitTargets, sumDailyHabitTargets } from '../../utils/dailyHabitTargets';
+
+type DailyTargetInfo = {
+  target: ReturnType<typeof normalizeDailyHabitTargets>;
+  remaining: ReturnType<typeof normalizeDailyHabitTargets>;
+  totalTarget: number;
+  totalRemaining: number;
+};
 
 type ActivityLogFormProps = {
   activity: Activity;
@@ -176,12 +184,19 @@ const PwaActivitiesPage = () => {
       }
     });
 
-    const targets = new Map<string, { target: number; remaining: number }>();
+    const targets = new Map<string, DailyTargetInfo>();
     state.activities.forEach((activity) => {
-      const target = activity.minLogsPerDay ?? 0;
-      if (target <= 0) return;
+      const target = normalizeDailyHabitTargets(activity.minLogsPerDay);
+      const totalTarget = sumDailyHabitTargets(target);
+      if (totalTarget <= 0) return;
       const loggedToday = todayLogs.get(activity.id) ?? 0;
-      targets.set(activity.id, { target, remaining: Math.max(target - loggedToday, 0) });
+      const remaining = calculateRemainingTargets(target, loggedToday);
+      targets.set(activity.id, {
+        target,
+        remaining,
+        totalTarget,
+        totalRemaining: sumDailyHabitTargets(remaining),
+      });
     });
 
     return targets;
@@ -190,9 +205,8 @@ const PwaActivitiesPage = () => {
   const { dailyHabits, regularActivities } = useMemo(() => {
     const dailyHabitIds = new Set<string>();
     const daily = activities.filter((activity) => {
-      const target = activity.minLogsPerDay ?? 0;
-      const remaining = dailyTargets.get(activity.id)?.remaining ?? target;
-      const isDaily = target > 0 && remaining > 0;
+      const target = dailyTargets.get(activity.id);
+      const isDaily = (target?.totalTarget ?? 0) > 0 && (target?.totalRemaining ?? 0) > 0;
       if (isDaily) {
         dailyHabitIds.add(activity.id);
       }
@@ -226,6 +240,10 @@ const PwaActivitiesPage = () => {
 
     return stats;
   }, [state.logs]);
+
+  const morningHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.morning ?? 0) > 0);
+  const dayHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.day ?? 0) > 0);
+  const eveningHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.evening ?? 0) > 0);
 
   const formatLastLogLabel = (lastLog: Date | null) => {
     if (!lastLog) return 'Noch kein Log';
@@ -267,84 +285,115 @@ const PwaActivitiesPage = () => {
       ) : (
         <div className="space-y-6">
           {!!dailyHabits.length && (
-            <section className="space-y-3">
+            <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
-                <p className="text-sm text-slate-400">Tägliche Ziele, die du heute noch erfüllen möchtest.</p>
+                <p className="text-sm text-slate-400">Morgens, tagsüber und abends abhaken.</p>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {dailyHabits.map((activity) => {
-                  const dailyTarget = dailyTargets.get(activity.id);
-                  return (
-                    <div
-                      key={activity.id}
-                      className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setSelectedActivity(activity)}
-                        className="flex w-full items-start gap-3 text-left transition hover:text-white"
-                      >
-                        <span
-                          className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
-                          style={{ backgroundColor: `${activity.color}33` }}
-                        >
-                          {activity.icon}
-                        </span>
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-base font-semibold text-white">{activity.name}</p>
-                            {activity.categories.some((category) => {
-                              const normalized = category.toLowerCase();
-                              return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
-                            }) && (
-                              <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
-                                {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
-                          <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
-                            <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                              Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
-                            </span>
-                            <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                              Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
-                            </span>
-                          </div>
-                          {dailyTarget && (
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
-                              <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
-                              <span
-                                className={`rounded-full px-2 py-1 ${
-                                  dailyTarget.remaining > 0
-                                    ? 'bg-slate-800 text-slate-100'
-                                    : 'bg-emerald-600/20 text-emerald-200'
-                                }`}
-                              >
-                                {dailyTarget.remaining > 0
-                                  ? `Heute noch ${dailyTarget.remaining} von ${dailyTarget.target}`
-                                  : 'Tagesziel erreicht'}
-                              </span>
-                            </div>
-                          )}
-                          {activity.categories?.length ? (
-                            <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
-                              {activity.categories.map((category) => (
-                                <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  {category}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
-                          )}
-                        </div>
-                      </button>
+              {[{ key: 'morning', title: 'Morgens', activities: morningHabits }, { key: 'day', title: 'Tag', activities: dayHabits }, { key: 'evening', title: 'Abend', activities: eveningHabits }]
+                .filter((section) => section.activities.length > 0)
+                .map((section) => (
+                  <div key={section.key} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-200">{section.title}</h3>
+                      <span className="text-xs text-slate-400">
+                        {section.activities.length} Habit{section.activities.length === 1 ? '' : 's'} offen
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {section.activities.map((activity) => {
+                        const dailyTarget = dailyTargets.get(activity.id);
+                        return (
+                          <div
+                            key={activity.id}
+                            className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setSelectedActivity(activity)}
+                              className="flex w-full items-start gap-3 text-left transition hover:text-white"
+                            >
+                              <span
+                                className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                                style={{ backgroundColor: `${activity.color}33` }}
+                              >
+                                {activity.icon}
+                              </span>
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-base font-semibold text-white">{activity.name}</p>
+                                  {activity.categories.some((category) => {
+                                    const normalized = category.toLowerCase();
+                                    return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
+                                  }) && (
+                                    <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
+                                      {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
+                                <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                                  <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                    Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
+                                  </span>
+                                  <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                    Letzte 7 Tage: {activityStats.get(activity.id)?.weekCount ?? 0}
+                                  </span>
+                                </div>
+                                {dailyTarget && (
+                                  <div className="space-y-1 text-[11px] font-semibold">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
+                                      <span
+                                        className={`rounded-full px-2 py-1 ${
+                                          dailyTarget.totalRemaining > 0
+                                            ? 'bg-slate-800 text-slate-100'
+                                            : 'bg-emerald-600/20 text-emerald-200'
+                                        }`}
+                                      >
+                                        {dailyTarget.totalRemaining > 0
+                                          ? `Heute noch ${dailyTarget.totalRemaining} von ${dailyTarget.totalTarget}`
+                                          : 'Tagesziel erreicht'}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
+                                      {dailyTarget.target.morning > 0 && (
+                                        <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                          Morgens: {dailyTarget.remaining.morning}/{dailyTarget.target.morning}
+                                        </span>
+                                      )}
+                                      {dailyTarget.target.day > 0 && (
+                                        <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                          Tag: {dailyTarget.remaining.day}/{dailyTarget.target.day}
+                                        </span>
+                                      )}
+                                      {dailyTarget.target.evening > 0 && (
+                                        <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                          Abend: {dailyTarget.remaining.evening}/{dailyTarget.target.evening}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {activity.categories?.length ? (
+                                  <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
+                                    {activity.categories.map((category) => (
+                                      <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
+                                        {category}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
+                                )}
+                              </div>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
             </section>
           )}
 
@@ -391,19 +440,38 @@ const PwaActivitiesPage = () => {
                           </span>
                         </div>
                         {dailyTarget && (
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
-                            <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
-                            <span
-                              className={`rounded-full px-2 py-1 ${
-                                dailyTarget.remaining > 0
-                                  ? 'bg-slate-800 text-slate-100'
-                                  : 'bg-emerald-600/20 text-emerald-200'
-                              }`}
-                            >
-                              {dailyTarget.remaining > 0
-                                ? `Heute noch ${dailyTarget.remaining} von ${dailyTarget.target}`
-                                : 'Tagesziel erreicht'}
-                            </span>
+                          <div className="space-y-1 text-[11px] font-semibold">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
+                              <span
+                                className={`rounded-full px-2 py-1 ${
+                                  dailyTarget.totalRemaining > 0
+                                    ? 'bg-slate-800 text-slate-100'
+                                    : 'bg-emerald-600/20 text-emerald-200'
+                                }`}
+                              >
+                                {dailyTarget.totalRemaining > 0
+                                  ? `Heute noch ${dailyTarget.totalRemaining} von ${dailyTarget.totalTarget}`
+                                  : 'Tagesziel erreicht'}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
+                              {dailyTarget.target.morning > 0 && (
+                                <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                  Morgens: {dailyTarget.remaining.morning}/{dailyTarget.target.morning}
+                                </span>
+                              )}
+                              {dailyTarget.target.day > 0 && (
+                                <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                  Tag: {dailyTarget.remaining.day}/{dailyTarget.target.day}
+                                </span>
+                              )}
+                              {dailyTarget.target.evening > 0 && (
+                                <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                  Abend: {dailyTarget.remaining.evening}/{dailyTarget.target.evening}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
                         {activity.categories?.length ? (
