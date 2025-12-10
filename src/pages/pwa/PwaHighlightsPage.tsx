@@ -465,7 +465,7 @@ const PwaHighlightsPage = () => {
 
       <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Letzte 7 Tage</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">7 Tage Streak</h2>
           <p className="text-xs text-slate-400">Tippe auf einen Tag, um die Highlights zu sehen.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-7">

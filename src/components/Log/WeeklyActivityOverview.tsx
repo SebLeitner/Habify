@@ -33,8 +33,7 @@ const WeeklyActivityOverview = ({ activityId, logs, className }: WeeklyActivityO
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-white">Letzte 7 Tage</p>
-        <p className="text-xs text-slate-400">Heute bis letzte Woche</p>
+        <p className="text-sm font-semibold text-white">7 Tage Streak</p>
       </div>
       <div className="mt-3 grid grid-cols-7 gap-2 text-center text-sm font-semibold text-slate-100">
         {countsByDay.map(({ day, count }) => (
