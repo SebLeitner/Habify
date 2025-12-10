@@ -1,12 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
 import TextArea from '../../components/UI/TextArea';
 import { Activity, type LogEntry, useData } from '../../contexts/DataContext';
-import type { LogAttributeValue } from '../../types';
+import type { DailyHabitTargets, LogAttributeValue } from '../../types';
 import {
   combineDateAndTimeToISO,
   currentLocalDate,
@@ -16,13 +16,20 @@ import {
   parseDisplayTimeToISO,
 } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
-import { calculateRemainingTargets, normalizeDailyHabitTargets, sumDailyHabitTargets } from '../../utils/dailyHabitTargets';
+import {
+  calculateRemainingTargets,
+  defaultDailyHabitTargets,
+  normalizeDailyHabitTargets,
+  sumDailyHabitTargets,
+} from '../../utils/dailyHabitTargets';
 
 type DailyTargetInfo = {
   target: ReturnType<typeof normalizeDailyHabitTargets>;
   remaining: ReturnType<typeof normalizeDailyHabitTargets>;
+  remainingAfterDismissals: ReturnType<typeof normalizeDailyHabitTargets>;
   totalTarget: number;
   totalRemaining: number;
+  totalRemainingAfterDismissals: number;
 };
 
 type ActivityLogFormProps = {
@@ -159,6 +166,16 @@ const PwaActivitiesPage = () => {
   const { state, addLog, isLoading, error } = useData();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [dismissedDailyHabits, setDismissedDailyHabits] = useState<Record<string, DailyHabitTargets>>({});
+  const [dismissedDate, setDismissedDate] = useState(() => startOfDay(new Date()).toISOString());
+
+  useEffect(() => {
+    const todayKey = startOfDay(new Date()).toISOString();
+    if (todayKey !== dismissedDate) {
+      setDismissedDailyHabits({});
+      setDismissedDate(todayKey);
+    }
+  }, [dismissedDate]);
 
   const activities = useMemo(
     () => state.activities.filter((activity) => activity.active).sort((a, b) => a.name.localeCompare(b.name, 'de')),
@@ -184,16 +201,25 @@ const PwaActivitiesPage = () => {
       if (totalTarget <= 0) return;
       const loggedToday = todayLogs.get(activity.id) ?? 0;
       const remaining = calculateRemainingTargets(target, loggedToday);
+      const dismissed = dismissedDailyHabits[activity.id] ?? defaultDailyHabitTargets;
+      const remainingAfterDismissals: DailyHabitTargets = {
+        morning: Math.max(remaining.morning - dismissed.morning, 0),
+        day: Math.max(remaining.day - dismissed.day, 0),
+        evening: Math.max(remaining.evening - dismissed.evening, 0),
+      };
+
       targets.set(activity.id, {
         target,
         remaining,
+        remainingAfterDismissals,
         totalTarget,
         totalRemaining: sumDailyHabitTargets(remaining),
+        totalRemainingAfterDismissals: sumDailyHabitTargets(remainingAfterDismissals),
       });
     });
 
     return targets;
-  }, [state.activities, state.logs]);
+  }, [dismissedDailyHabits, state.activities, state.logs]);
 
   const { dailyHabits, regularActivities } = useMemo(() => {
     const dailyHabitIds = new Set<string>();
@@ -234,9 +260,13 @@ const PwaActivitiesPage = () => {
     return stats;
   }, [state.logs]);
 
-  const morningHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.morning ?? 0) > 0);
-  const dayHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.day ?? 0) > 0);
-  const eveningHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remaining.evening ?? 0) > 0);
+  const morningHabits = dailyHabits.filter(
+    (activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.morning ?? 0) > 0,
+  );
+  const dayHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.day ?? 0) > 0);
+  const eveningHabits = dailyHabits.filter(
+    (activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.evening ?? 0) > 0,
+  );
 
   const formatLastLogLabel = (lastLog: Date | null) => {
     if (!lastLog) return 'Noch kein Log';
@@ -247,6 +277,23 @@ const PwaActivitiesPage = () => {
     if (daysAgo === 1) return 'Gestern';
     if (daysAgo === 2) return 'Vor 2 Tagen';
     return 'Längere Pause';
+  };
+
+  const handleDismissHabit = (activityId: string, slot: keyof DailyHabitTargets) => {
+    const target = dailyTargets.get(activityId);
+    const remainingInSlot = target?.remainingAfterDismissals[slot] ?? 0;
+    if (!target || remainingInSlot <= 0) return;
+
+    setDismissedDailyHabits((previous) => {
+      const current = previous[activityId] ?? defaultDailyHabitTargets;
+      return {
+        ...previous,
+        [activityId]: {
+          ...current,
+          [slot]: current[slot] + 1,
+        },
+      };
+    });
   };
 
   const handleAddLog = async (values: { activityId: string; timestamp: string; note?: string; attributes?: LogAttributeValue[] }) => {
@@ -281,7 +328,11 @@ const PwaActivitiesPage = () => {
                 <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
                 <p className="text-sm text-slate-400">Morgens, tagsüber und abends abhaken.</p>
               </div>
-              {[{ key: 'morning', title: 'Morgens', activities: morningHabits }, { key: 'day', title: 'Tag', activities: dayHabits }, { key: 'evening', title: 'Abend', activities: eveningHabits }]
+              {[
+                { key: 'morning' as const, title: 'Morgens', activities: morningHabits },
+                { key: 'day' as const, title: 'Tag', activities: dayHabits },
+                { key: 'evening' as const, title: 'Abend', activities: eveningHabits },
+              ]
                 .filter((section) => section.activities.length > 0)
                 .map((section) => (
                   <div key={section.key} className="space-y-2">
@@ -323,7 +374,6 @@ const PwaActivitiesPage = () => {
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
                                   <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
                                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
                                       Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
@@ -338,30 +388,30 @@ const PwaActivitiesPage = () => {
                                         <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
                                         <span
                                           className={`rounded-full px-2 py-1 ${
-                                            dailyTarget.totalRemaining > 0
+                                            dailyTarget.totalRemainingAfterDismissals > 0
                                               ? 'bg-slate-800 text-slate-100'
                                               : 'bg-emerald-600/20 text-emerald-200'
                                           }`}
                                         >
-                                          {dailyTarget.totalRemaining > 0
-                                            ? `Heute noch ${dailyTarget.totalRemaining} von ${dailyTarget.totalTarget}`
+                                          {dailyTarget.totalRemainingAfterDismissals > 0
+                                            ? `Heute noch ${dailyTarget.totalRemainingAfterDismissals} von ${dailyTarget.totalTarget}`
                                             : 'Tagesziel erreicht'}
                                         </span>
                                       </div>
                                       <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                                         {dailyTarget.target.morning > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Morgens: {dailyTarget.remaining.morning}/{dailyTarget.target.morning}
+                                            Morgens: {dailyTarget.remainingAfterDismissals.morning}/{dailyTarget.target.morning}
                                           </span>
                                         )}
                                         {dailyTarget.target.day > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Tag: {dailyTarget.remaining.day}/{dailyTarget.target.day}
+                                            Tag: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
                                           </span>
                                         )}
                                         {dailyTarget.target.evening > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Abend: {dailyTarget.remaining.evening}/{dailyTarget.target.evening}
+                                            Abend: {dailyTarget.remainingAfterDismissals.evening}/{dailyTarget.target.evening}
                                           </span>
                                         )}
                                       </div>
@@ -379,6 +429,13 @@ const PwaActivitiesPage = () => {
                                     <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
                                   )}
                                 </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDismissHabit(activity.id, section.key)}
+                                className="rounded-lg border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+                              >
+                                Nicht erfüllt
                               </button>
                             </div>
                           </div>
@@ -423,7 +480,6 @@ const PwaActivitiesPage = () => {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400">Tippen zum Eintragen</p>
                         <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
                             Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
@@ -438,30 +494,30 @@ const PwaActivitiesPage = () => {
                               <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
                               <span
                                 className={`rounded-full px-2 py-1 ${
-                                  dailyTarget.totalRemaining > 0
+                                  dailyTarget.totalRemainingAfterDismissals > 0
                                     ? 'bg-slate-800 text-slate-100'
                                     : 'bg-emerald-600/20 text-emerald-200'
                                 }`}
                               >
-                                {dailyTarget.totalRemaining > 0
-                                  ? `Heute noch ${dailyTarget.totalRemaining} von ${dailyTarget.totalTarget}`
+                                {dailyTarget.totalRemainingAfterDismissals > 0
+                                  ? `Heute noch ${dailyTarget.totalRemainingAfterDismissals} von ${dailyTarget.totalTarget}`
                                   : 'Tagesziel erreicht'}
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                               {dailyTarget.target.morning > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Morgens: {dailyTarget.remaining.morning}/{dailyTarget.target.morning}
+                                  Morgens: {dailyTarget.remainingAfterDismissals.morning}/{dailyTarget.target.morning}
                                 </span>
                               )}
                               {dailyTarget.target.day > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Tag: {dailyTarget.remaining.day}/{dailyTarget.target.day}
+                                  Tag: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
                                 </span>
                               )}
                               {dailyTarget.target.evening > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Abend: {dailyTarget.remaining.evening}/{dailyTarget.target.evening}
+                                  Abend: {dailyTarget.remainingAfterDismissals.evening}/{dailyTarget.target.evening}
                                 </span>
                               )}
                             </div>
