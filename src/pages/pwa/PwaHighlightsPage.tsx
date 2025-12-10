@@ -328,9 +328,6 @@ const PwaHighlightsPage = () => {
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Momente</p>
           <h1 className="text-xl font-semibold text-white">Highlights</h1>
-          <p className="text-sm text-slate-400">
-            Halte deine besten Momente fest. Speichern funktioniert nur online.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" className="whitespace-nowrap" onClick={exportHighlights}>
