@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
@@ -162,20 +162,39 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
   );
 };
 
+const DISMISS_NOTE_PREFIX = '__DISMISS__:';
+const isDismissalLog = (log: LogEntry) =>
+  (log.note ?? '').startsWith(DISMISS_NOTE_PREFIX) &&
+  ['morning', 'day', 'evening'].some((slot) => log.note === `${DISMISS_NOTE_PREFIX}${slot}`);
+
+const extractDismissalsForToday = (logs: LogEntry[]) => {
+  const todayStart = startOfDay(new Date());
+  const todayEnd = endOfDay(new Date());
+  const dismissals = new Map<string, DailyHabitTargets>();
+
+  logs.forEach((log) => {
+    if (!isDismissalLog(log)) return;
+
+    const timestamp = new Date(log.timestamp);
+    if (!isWithinInterval(timestamp, { start: todayStart, end: todayEnd })) return;
+
+    const slot = (log.note ?? '').replace(DISMISS_NOTE_PREFIX, '') as keyof DailyHabitTargets;
+    const current = dismissals.get(log.activityId) ?? { ...defaultDailyHabitTargets };
+    dismissals.set(log.activityId, {
+      ...current,
+      [slot]: (current[slot] ?? 0) + 1,
+    });
+  });
+
+  return dismissals;
+};
+
 const PwaActivitiesPage = () => {
   const { state, addLog, isLoading, error } = useData();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [dismissedDailyHabits, setDismissedDailyHabits] = useState<Record<string, DailyHabitTargets>>({});
-  const [dismissedDate, setDismissedDate] = useState(() => startOfDay(new Date()).toISOString());
 
-  useEffect(() => {
-    const todayKey = startOfDay(new Date()).toISOString();
-    if (todayKey !== dismissedDate) {
-      setDismissedDailyHabits({});
-      setDismissedDate(todayKey);
-    }
-  }, [dismissedDate]);
+  const dismissalsForToday = useMemo(() => extractDismissalsForToday(state.logs), [state.logs]);
 
   const activities = useMemo(
     () => state.activities.filter((activity) => activity.active).sort((a, b) => a.name.localeCompare(b.name, 'de')),
@@ -189,7 +208,7 @@ const PwaActivitiesPage = () => {
     const todayLogs = new Map<string, number>();
     state.logs.forEach((log) => {
       const timestamp = new Date(log.timestamp);
-      if (isWithinInterval(timestamp, { start: todayStart, end: todayEnd })) {
+      if (isWithinInterval(timestamp, { start: todayStart, end: todayEnd }) && !isDismissalLog(log)) {
         todayLogs.set(log.activityId, (todayLogs.get(log.activityId) ?? 0) + 1);
       }
     });
@@ -201,7 +220,7 @@ const PwaActivitiesPage = () => {
       if (totalTarget <= 0) return;
       const loggedToday = todayLogs.get(activity.id) ?? 0;
       const remaining = calculateRemainingTargets(target, loggedToday);
-      const dismissed = dismissedDailyHabits[activity.id] ?? defaultDailyHabitTargets;
+      const dismissed = dismissalsForToday.get(activity.id) ?? defaultDailyHabitTargets;
       const remainingAfterDismissals: DailyHabitTargets = {
         morning: Math.max(remaining.morning - dismissed.morning, 0),
         day: Math.max(remaining.day - dismissed.day, 0),
@@ -219,7 +238,7 @@ const PwaActivitiesPage = () => {
     });
 
     return targets;
-  }, [dismissedDailyHabits, state.activities, state.logs]);
+  }, [dismissalsForToday, state.activities, state.logs]);
 
   const { dailyHabits, regularActivities } = useMemo(() => {
     const dailyHabitIds = new Set<string>();
@@ -245,6 +264,8 @@ const PwaActivitiesPage = () => {
     const stats = new Map<string, { lastLog: Date | null; todayCount: number; weekCount: number }>();
 
     state.logs.forEach((log) => {
+      if (isDismissalLog(log)) return;
+
       const timestamp = new Date(log.timestamp);
       const current = stats.get(log.activityId) ?? { lastLog: null, todayCount: 0, weekCount: 0 };
 
@@ -284,15 +305,14 @@ const PwaActivitiesPage = () => {
     const remainingInSlot = target?.remainingAfterDismissals[slot] ?? 0;
     if (!target || remainingInSlot <= 0) return;
 
-    setDismissedDailyHabits((previous) => {
-      const current = previous[activityId] ?? defaultDailyHabitTargets;
-      return {
-        ...previous,
-        [activityId]: {
-          ...current,
-          [slot]: current[slot] + 1,
-        },
-      };
+    setActionError(null);
+    addLog({
+      activityId,
+      timestamp: new Date().toISOString(),
+      note: `${DISMISS_NOTE_PREFIX}${slot}`,
+    }).catch((apiError) => {
+      console.error('PWA: Daily Habit konnte nicht verworfen werden', apiError);
+      setActionError('Dismiss fehlgeschlagen – bitte Verbindung zum Backend prüfen.');
     });
   };
 
