@@ -6,6 +6,7 @@ import Button from '../../components/UI/Button';
 import { useData } from '../../contexts/DataContext';
 import { formatAttributeValue } from '../../utils/logFormatting';
 import type { LogEntry } from '../../types';
+import { isDismissalLog } from '../../utils/logs';
 
 type UnifiedEntry =
   | {
@@ -46,10 +47,12 @@ const formatDateHeading = (dateKey: string) =>
 const PwaLogPage = () => {
   const { state, isLoading, error, updateLog, deleteLog } = useData();
 
+  const visibleLogs = useMemo(() => state.logs.filter((log) => !isDismissalLog(log)), [state.logs]);
+
   const entries = useMemo<UnifiedEntry[]>(() => {
     const activityLookup = new Map(state.activities.map((activity) => [activity.id, activity]));
 
-    const logEntries: UnifiedEntry[] = state.logs.map((log) => {
+    const logEntries: UnifiedEntry[] = visibleLogs.map((log) => {
       const activity = activityLookup.get(log.activityId);
       const dateKey = log.timestamp.slice(0, 10);
       return {
@@ -85,14 +88,11 @@ const PwaLogPage = () => {
     return [...logEntries, ...highlightEntries].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
-  }, [state.activities, state.highlights, state.logs]);
+  }, [state.activities, state.highlights, visibleLogs]);
 
-  const activityById = useMemo(
-    () => new Map(state.activities.map((activity) => [activity.id, activity])),
-    [state.activities],
-  );
+  const activityById = useMemo(() => new Map(state.activities.map((activity) => [activity.id, activity])), [state.activities]);
 
-  const findLogById = (id: string) => state.logs.find((log) => log.id === id) ?? null;
+  const findLogById = (id: string) => visibleLogs.find((log) => log.id === id) ?? null;
 
   const [selectedLog, setSelectedLog] = useState<UnifiedEntry | null>(null);
   const [editingLog, setEditingLog] = useState<LogEntry | null>(null);
@@ -270,7 +270,7 @@ const PwaLogPage = () => {
             userId: selectedLog.userId,
           }}
           activity={activityById.get(selectedLog.activityId)}
-          logs={state.logs}
+          logs={visibleLogs}
           open={!!selectedLog}
           onOpenChange={(open) => {
             if (!open) {
@@ -303,7 +303,7 @@ const PwaLogPage = () => {
                   <div className="space-y-4 pt-4">
                     <LogForm
                       activities={state.activities}
-                      logs={state.logs}
+                      logs={visibleLogs}
                       initialLog={editingLog}
                       onSubmit={handleUpdateLog}
                       onCancel={() => setEditingLog(null)}
