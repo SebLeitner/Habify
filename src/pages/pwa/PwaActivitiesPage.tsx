@@ -117,7 +117,7 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
             required
           >
             <option value="morning">Morgens</option>
-            <option value="day">Mittags</option>
+            <option value="day">tagsüber</option>
             <option value="evening">Abends</option>
           </select>
         </label>

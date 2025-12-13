@@ -3,7 +3,7 @@ import type { ActivityAttribute, LogAttributeValue, LogEntry } from '../types';
 const resolveTimeSlotLabel = (log: Pick<LogEntry, 'timestamp' | 'timeSlot'>) => {
   const map: Record<NonNullable<LogEntry['timeSlot']>, string> = {
     morning: 'Morgens',
-    day: 'Mittags',
+    day: 'tagsüber',
     evening: 'Abends',
   };
 
