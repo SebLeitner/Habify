@@ -1,6 +1,7 @@
 import { format, isSameDay, startOfDay, subDays } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { type LogEntry } from '../../contexts/DataContext';
+import { isDismissalLog } from '../../utils/logs';
 
 type WeeklyActivityOverviewProps = {
   activityId: string;
@@ -12,7 +13,9 @@ const WeeklyActivityOverview = ({ activityId, logs, className }: WeeklyActivityO
   const today = startOfDay(new Date());
   const lastSevenDays = Array.from({ length: 7 }, (_, index) => subDays(today, index));
 
-  const activityLogs = logs.filter((log) => log.activityId === activityId);
+  const activityLogs = logs.filter(
+    (log) => log.activityId === activityId && !isDismissalLog(log),
+  );
 
   const countsByDay = lastSevenDays.map((day) => {
     const countForDay = activityLogs.reduce((count, log) => {

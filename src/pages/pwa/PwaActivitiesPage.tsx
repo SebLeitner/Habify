@@ -15,6 +15,7 @@ import {
   normalizeDailyHabitTargets,
   sumDailyHabitTargets,
 } from '../../utils/dailyHabitTargets';
+import { DISMISS_NOTE_PREFIX, isDismissalLog } from '../../utils/logs';
 
 type DailyTargetInfo = {
   target: ReturnType<typeof normalizeDailyHabitTargets>;
@@ -145,11 +146,6 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
     </form>
   );
 };
-
-const DISMISS_NOTE_PREFIX = '__DISMISS__:';
-const isDismissalLog = (log: LogEntry) =>
-  (log.note ?? '').startsWith(DISMISS_NOTE_PREFIX) &&
-  ['morning', 'day', 'evening'].some((slot) => log.note === `${DISMISS_NOTE_PREFIX}${slot}`);
 
 const extractDismissalsForToday = (logs: LogEntry[]) => {
   const todayStart = startOfDay(new Date());
