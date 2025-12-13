@@ -35,12 +35,12 @@ type UnifiedEntry =
 
 const formatTimeSlot = (log: Pick<LogEntry, 'timestamp' | 'timeSlot'>) => {
   if (log.timeSlot === 'morning') return 'Morgens';
-  if (log.timeSlot === 'day') return 'Mittags';
+  if (log.timeSlot === 'day') return 'tagsüber';
   if (log.timeSlot === 'evening') return 'Abends';
 
   const hour = new Date(log.timestamp).getHours();
   if (hour < 12) return 'Morgens';
-  if (hour < 18) return 'Mittags';
+  if (hour < 18) return 'tagsüber';
   return 'Abends';
 };
 
