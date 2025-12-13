@@ -7,14 +7,7 @@ import Input from '../../components/UI/Input';
 import TextArea from '../../components/UI/TextArea';
 import { Activity, type LogEntry, useData } from '../../contexts/DataContext';
 import type { DailyHabitTargets, LogAttributeValue } from '../../types';
-import {
-  combineDateAndTimeToISO,
-  currentLocalDate,
-  currentLocalTime,
-  formatDateForDisplay,
-  parseDisplayDateToISO,
-  parseDisplayTimeToISO,
-} from '../../utils/datetime';
+import { currentLocalDate, dateToISODate, formatDateForDisplay, parseDisplayDateToISO } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
 import {
   calculateRemainingTargets,
@@ -37,6 +30,7 @@ type ActivityLogFormProps = {
   onAddLog: (values: {
     activityId: string;
     timestamp: string;
+    timeSlot?: 'morning' | 'day' | 'evening';
     note?: string;
     attributes?: LogAttributeValue[];
   }) => Promise<void>;
@@ -47,13 +41,11 @@ type ActivityLogFormProps = {
 const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormProps) => {
   const firefox = isFirefox();
   const initialDate = currentLocalDate();
-  const initialTime = currentLocalTime();
   const [date, setDate] = useState(initialDate);
-  const [time, setTime] = useState(initialTime);
   const [firefoxDateInput, setFirefoxDateInput] = useState(() =>
     firefox ? formatDateForDisplay(initialDate) : '',
   );
-  const [firefoxTimeInput, setFirefoxTimeInput] = useState(() => (firefox ? initialTime : ''));
+  const [timeSlot, setTimeSlot] = useState<'morning' | 'day' | 'evening'>('morning');
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,23 +54,22 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
     event.preventDefault();
     setIsSaving(true);
     try {
-      if (!date || !time) {
-        throw new Error('Bitte Datum und Uhrzeit auswählen.');
+      if (!date) {
+        throw new Error('Bitte Datum und Tageszeit auswählen.');
       }
 
       await onAddLog({
         activityId: activity.id,
-        timestamp: combineDateAndTimeToISO(date, time),
+        timestamp: dateToISODate(date),
+        timeSlot,
         note: note.trim() ? note.trim() : undefined,
       });
       const resetDate = currentLocalDate();
-      const resetTime = currentLocalTime();
       setDate(resetDate);
-      setTime(resetTime);
       if (firefox) {
         setFirefoxDateInput(formatDateForDisplay(resetDate));
-        setFirefoxTimeInput(resetTime);
       }
+      setTimeSlot('morning');
       setNote('');
       setError(null);
       onClose();
@@ -116,26 +107,19 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
           }}
           required
         />
-        <Input
-          label="Uhrzeit"
-          type={firefox ? 'text' : 'time'}
-          lang="de-DE"
-          inputMode="numeric"
-          placeholder={firefox ? 'HH:MM' : undefined}
-          pattern={firefox ? '([01]\\d|2[0-3]):([0-5]\\d)' : undefined}
-          value={firefox ? firefoxTimeInput : time}
-          onChange={(event) => {
-            const { value } = event.target;
-            if (firefox) {
-              setFirefoxTimeInput(value);
-              const parsed = parseDisplayTimeToISO(value);
-              setTime(parsed);
-              return;
-            }
-            setTime(value);
-          }}
-          required
-        />
+        <label className="flex flex-col gap-2 text-sm text-slate-200">
+          <span className="font-medium text-slate-100">Tageszeit</span>
+          <select
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40"
+            value={timeSlot}
+            onChange={(event) => setTimeSlot(event.target.value as 'morning' | 'day' | 'evening')}
+            required
+          >
+            <option value="morning">Morgens</option>
+            <option value="day">Mittags</option>
+            <option value="evening">Abends</option>
+          </select>
+        </label>
       </div>
       <WeeklyActivityOverview activityId={activity.id} logs={logs} />
       <TextArea
@@ -205,11 +189,21 @@ const PwaActivitiesPage = () => {
     const todayStart = startOfDay(new Date());
     const todayEnd = endOfDay(new Date());
 
-    const todayLogs = new Map<string, number>();
+    const todayLogs = new Map<string, DailyHabitTargets & { unslotted: number }>();
     state.logs.forEach((log) => {
       const timestamp = new Date(log.timestamp);
       if (isWithinInterval(timestamp, { start: todayStart, end: todayEnd }) && !isDismissalLog(log)) {
-        todayLogs.set(log.activityId, (todayLogs.get(log.activityId) ?? 0) + 1);
+        const current =
+          todayLogs.get(log.activityId) ?? { ...defaultDailyHabitTargets, unslotted: 0 };
+        const slot = log.timeSlot;
+
+        if (slot && ['morning', 'day', 'evening'].includes(slot)) {
+          current[slot as keyof DailyHabitTargets] += 1;
+        } else {
+          current.unslotted += 1;
+        }
+
+        todayLogs.set(log.activityId, current);
       }
     });
 
@@ -218,8 +212,14 @@ const PwaActivitiesPage = () => {
       const target = normalizeDailyHabitTargets(activity.minLogsPerDay);
       const totalTarget = sumDailyHabitTargets(target);
       if (totalTarget <= 0) return;
-      const loggedToday = todayLogs.get(activity.id) ?? 0;
-      const remaining = calculateRemainingTargets(target, loggedToday);
+
+      const loggedToday = todayLogs.get(activity.id) ?? { ...defaultDailyHabitTargets, unslotted: 0 };
+      const remainingAfterSlotted: DailyHabitTargets = {
+        morning: Math.max(target.morning - loggedToday.morning, 0),
+        day: Math.max(target.day - loggedToday.day, 0),
+        evening: Math.max(target.evening - loggedToday.evening, 0),
+      };
+      const remaining = calculateRemainingTargets(remainingAfterSlotted, loggedToday.unslotted);
       const dismissed = dismissalsForToday.get(activity.id) ?? defaultDailyHabitTargets;
       const remainingAfterDismissals: DailyHabitTargets = {
         morning: Math.max(remaining.morning - dismissed.morning, 0),
@@ -329,11 +329,6 @@ const PwaActivitiesPage = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Main Quest</h1>
-        </div>
-      </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
       {actionError && <p className="text-sm text-red-400">{actionError}</p>}
       {isLoading ? (
@@ -344,10 +339,7 @@ const PwaActivitiesPage = () => {
         <div className="space-y-6">
           {!!dailyHabits.length && (
             <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
-                <p className="text-sm text-slate-400">Morgens, tagsüber und abends abhaken.</p>
-              </div>
+              <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
               {[
                 { key: 'morning' as const, title: 'Morgens', activities: morningHabits },
                 { key: 'day' as const, title: 'Tag', activities: dayHabits },
@@ -404,20 +396,6 @@ const PwaActivitiesPage = () => {
                                   </div>
                                   {dailyTarget && (
                                     <div className="space-y-1 text-[11px] font-semibold">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
-                                        <span
-                                          className={`rounded-full px-2 py-1 ${
-                                            dailyTarget.totalRemainingAfterDismissals > 0
-                                              ? 'bg-slate-800 text-slate-100'
-                                              : 'bg-emerald-600/20 text-emerald-200'
-                                          }`}
-                                        >
-                                          {dailyTarget.totalRemainingAfterDismissals > 0
-                                            ? `Heute noch ${dailyTarget.totalRemainingAfterDismissals} von ${dailyTarget.totalTarget}`
-                                            : 'Tagesziel erreicht'}
-                                        </span>
-                                      </div>
                                       <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                                         {dailyTarget.target.morning > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
@@ -455,7 +433,7 @@ const PwaActivitiesPage = () => {
                                 onClick={() => handleDismissHabit(activity.id, section.key)}
                                 className="rounded-lg border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
                               >
-                                Nicht erfüllt
+                                Pausieren
                               </button>
                             </div>
                           </div>
@@ -510,20 +488,6 @@ const PwaActivitiesPage = () => {
                         </div>
                         {dailyTarget && (
                           <div className="space-y-1 text-[11px] font-semibold">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
-                              <span
-                                className={`rounded-full px-2 py-1 ${
-                                  dailyTarget.totalRemainingAfterDismissals > 0
-                                    ? 'bg-slate-800 text-slate-100'
-                                    : 'bg-emerald-600/20 text-emerald-200'
-                                }`}
-                              >
-                                {dailyTarget.totalRemainingAfterDismissals > 0
-                                  ? `Heute noch ${dailyTarget.totalRemainingAfterDismissals} von ${dailyTarget.totalTarget}`
-                                  : 'Tagesziel erreicht'}
-                              </span>
-                            </div>
                             <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                               {dailyTarget.target.morning > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">

@@ -3,14 +3,7 @@ import { Activity, type LogEntry } from '../../contexts/DataContext';
 import Button from '../UI/Button';
 import Input from '../UI/Input';
 import TextArea from '../UI/TextArea';
-import {
-  combineDateAndTimeToISO,
-  currentLocalDate,
-  currentLocalTime,
-  formatDateForDisplay,
-  parseDisplayDateToISO,
-  parseDisplayTimeToISO,
-} from '../../utils/datetime';
+import { currentLocalDate, dateToISODate, formatDateForDisplay, parseDisplayDateToISO } from '../../utils/datetime';
 import AttributeValuesForm from '../Log/AttributeValuesForm';
 import { emptyDrafts, serializeDrafts, toDrafts, type AttributeValueDraft } from '../../utils/attributes';
 import type { LogAttributeValue } from '../../types';
@@ -23,6 +16,7 @@ type ActivityQuickLogListProps = {
   onAddLog: (values: {
     activityId: string;
     timestamp: string;
+    timeSlot?: 'morning' | 'day' | 'evening';
     note?: string;
     attributes?: LogAttributeValue[];
   }) => Promise<void>;
@@ -53,14 +47,12 @@ const ActivityCard = ({
 }) => {
   const firefox = isFirefox();
   const initialDate = currentLocalDate();
-  const initialTime = currentLocalTime();
   const [isExpanded, setIsExpanded] = useState(false);
   const [date, setDate] = useState(initialDate);
-  const [time, setTime] = useState(initialTime);
   const [firefoxDateInput, setFirefoxDateInput] = useState(() =>
     firefox ? formatDateForDisplay(initialDate) : '',
   );
-  const [firefoxTimeInput, setFirefoxTimeInput] = useState(() => (firefox ? initialTime : ''));
+  const [timeSlot, setTimeSlot] = useState<'morning' | 'day' | 'evening'>('morning');
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,13 +73,11 @@ const ActivityCard = ({
       const next = !previous;
       if (next) {
         const resetDate = currentLocalDate();
-        const resetTime = currentLocalTime();
         setDate(resetDate);
-        setTime(resetTime);
         if (firefox) {
           setFirefoxDateInput(formatDateForDisplay(resetDate));
-          setFirefoxTimeInput(resetTime);
         }
+        setTimeSlot('morning');
         setDrafts(toDrafts(activity.attributes));
       }
       return next;
@@ -106,41 +96,28 @@ const ActivityCard = ({
     setDate(value);
   };
 
-  const handleTimeChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { value } = event.target;
-    if (firefox) {
-      setFirefoxTimeInput(value);
-      const parsed = parseDisplayTimeToISO(value);
-      setTime(parsed);
-      return;
-    }
-
-    setTime(value);
-  };
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
     try {
       const attributeValues = serializeDrafts(drafts);
-      if (!date || !time) {
-        throw new Error('Bitte Datum und Uhrzeit auswählen.');
+      if (!date) {
+        throw new Error('Bitte Datum und Tageszeit auswählen.');
       }
       await onAddLog({
         activityId: activity.id,
-        timestamp: combineDateAndTimeToISO(date, time),
+        timestamp: dateToISODate(date),
+        timeSlot,
         note: note.trim() ? note.trim() : undefined,
         attributes: attributeValues.length ? attributeValues : undefined,
       });
       setNote('');
       const resetDate = currentLocalDate();
-      const resetTime = currentLocalTime();
       setDate(resetDate);
-      setTime(resetTime);
       if (firefox) {
         setFirefoxDateInput(formatDateForDisplay(resetDate));
-        setFirefoxTimeInput(resetTime);
       }
+      setTimeSlot('morning');
       setDrafts(emptyDrafts(activity.attributes));
       setIsExpanded(false);
       setError(null);
@@ -185,20 +162,6 @@ const ActivityCard = ({
             </p>
             {dailyTarget && (
               <div className="space-y-1 text-[11px] font-semibold">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Daily Habit</span>
-                  <span
-                    className={`rounded-full px-2 py-1 ${
-                      dailyTarget.totalRemaining > 0
-                        ? 'bg-slate-800 text-slate-100'
-                        : 'bg-emerald-600/20 text-emerald-200'
-                    }`}
-                  >
-                    {dailyTarget.totalRemaining > 0
-                      ? `Heute noch ${dailyTarget.totalRemaining} von ${dailyTarget.totalTarget}`
-                      : 'Tagesziel erreicht'}
-                  </span>
-                </div>
                 <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                   {dailyTarget.target.morning > 0 && (
                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
@@ -257,17 +220,19 @@ const ActivityCard = ({
                 onChange={handleDateChange}
                 required
               />
-              <Input
-                label="Uhrzeit"
-                type={firefox ? 'text' : 'time'}
-                lang="de-DE"
-                inputMode="numeric"
-                placeholder={firefox ? 'HH:MM' : undefined}
-                pattern={firefox ? '([01]\\d|2[0-3]):([0-5]\\d)' : undefined}
-                value={firefox ? firefoxTimeInput : time}
-                onChange={handleTimeChange}
-                required
-              />
+              <label className="flex flex-col gap-2 text-sm text-slate-200">
+                <span className="font-medium text-slate-100">Tageszeit</span>
+                <select
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40"
+                  value={timeSlot}
+                  onChange={(event) => setTimeSlot(event.target.value as 'morning' | 'day' | 'evening')}
+                  required
+                >
+                  <option value="morning">Morgens</option>
+                  <option value="day">Mittags</option>
+                  <option value="evening">Abends</option>
+                </select>
+              </label>
             </div>
             <AttributeValuesForm attributes={activity.attributes} drafts={drafts} onChange={setDrafts} />
             <TextArea
