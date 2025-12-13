@@ -54,6 +54,7 @@ export type LogEntry = {
   id: string;
   activityId: string;
   timestamp: string;
+  timeSlot?: 'morning' | 'day' | 'evening';
   note?: string;
   attributes?: LogAttributeValue[];
   userId: string;

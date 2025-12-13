@@ -76,7 +76,7 @@ const ActivityForm = ({
       <ColorPicker label="Farbe" value={color} onChange={(event) => setColor(event.target.value)} />
       <div className="grid gap-3 sm:grid-cols-3">
         <Input
-          label="Morgens (Daily Habit)"
+          label="Morgens"
           type="number"
           min={0}
           step={1}

@@ -23,6 +23,8 @@ export const currentLocalTime = () => {
   return now.toISOString().slice(11, 16);
 };
 
+export const dateToISODate = (date: string) => `${date}T00:00:00.000Z`;
+
 export const combineDateAndTimeToISO = (date: string, time: string) => {
   return new Date(`${date}T${time}`).toISOString();
 };

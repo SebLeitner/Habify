@@ -33,11 +33,20 @@ const ActivitiesPage = () => {
     const todayStart = startOfDay(new Date());
     const todayEnd = endOfDay(new Date());
 
-    const todayLogs = new Map<string, number>();
+    const todayLogs = new Map<string, ReturnType<typeof normalizeDailyHabitTargets> & { unslotted: number }>();
     state.logs.forEach((log) => {
       const timestamp = new Date(log.timestamp);
       if (isWithinInterval(timestamp, { start: todayStart, end: todayEnd })) {
-        todayLogs.set(log.activityId, (todayLogs.get(log.activityId) ?? 0) + 1);
+        const current = todayLogs.get(log.activityId) ?? { morning: 0, day: 0, evening: 0, unslotted: 0 };
+        const slot = log.timeSlot;
+
+        if (slot && ['morning', 'day', 'evening'].includes(slot)) {
+          current[slot as keyof ReturnType<typeof normalizeDailyHabitTargets>] += 1;
+        } else {
+          current.unslotted += 1;
+        }
+
+        todayLogs.set(log.activityId, current);
       }
     });
 
@@ -46,8 +55,13 @@ const ActivitiesPage = () => {
       const target = normalizeDailyHabitTargets(activity.minLogsPerDay);
       const totalTarget = sumDailyHabitTargets(target);
       if (totalTarget <= 0) return;
-      const loggedToday = todayLogs.get(activity.id) ?? 0;
-      const remaining = calculateRemainingTargets(target, loggedToday);
+      const loggedToday = todayLogs.get(activity.id) ?? { morning: 0, day: 0, evening: 0, unslotted: 0 };
+      const remainingAfterSlots = {
+        morning: Math.max(target.morning - loggedToday.morning, 0),
+        day: Math.max(target.day - loggedToday.day, 0),
+        evening: Math.max(target.evening - loggedToday.evening, 0),
+      } as const;
+      const remaining = calculateRemainingTargets(remainingAfterSlots, loggedToday.unslotted);
       targets.set(activity.id, {
         target,
         remaining,
@@ -141,10 +155,7 @@ const ActivitiesPage = () => {
         <div className="space-y-6">
           {!!dailyHabits.length && (
             <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
-                <p className="text-sm text-slate-400">Morgens, tagsüber und abends abhaken.</p>
-              </div>
+              <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
               <div className="space-y-5">
                 {[
                   { key: 'morning', title: 'Morgens', activities: morningHabits },
