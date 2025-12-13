@@ -40,7 +40,13 @@ const ActivityCard = ({
   dailyTarget,
 }: {
   activity: Activity;
-  onAddLog: (values: { activityId: string; timestamp: string; note?: string; attributes?: LogAttributeValue[] }) => Promise<void>;
+  onAddLog: (values: {
+    activityId: string;
+    timestamp: string;
+    timeSlot?: 'morning' | 'day' | 'evening';
+    note?: string;
+    attributes?: LogAttributeValue[];
+  }) => Promise<void>;
   logs: LogEntry[];
   dense?: boolean;
   dailyTarget?: DailyTargetInfo;
