@@ -187,20 +187,6 @@ const ActivityCard = ({
                 </div>
               </div>
             )}
-            {activity.categories?.length ? (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {activity.categories.map((category) => (
-                  <span
-                    key={category}
-                    className={`rounded-full bg-slate-800 ${dense ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} font-medium text-slate-100`}
-                  >
-                    {category}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <span className="text-xs text-slate-500">Keine Kategorien</span>
-            )}
           </div>
         </div>
       </div>

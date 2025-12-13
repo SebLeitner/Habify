@@ -9,16 +9,7 @@ import { Activity, useData } from '../contexts/DataContext';
 const ActivityEditorPage = () => {
   const { state, addActivity, updateActivity, deleteActivity, isLoading, error } = useData();
   const [sort, setSort] = useState<'createdAt' | 'name'>('createdAt');
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [editing, setEditing] = useState<Activity | null>(null);
-
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    state.activities.forEach((activity) => {
-      activity.categories?.forEach((category) => set.add(category));
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'de'));
-  }, [state.activities]);
 
   const activities = useMemo(() => {
     const sorted = [...state.activities];
@@ -27,11 +18,8 @@ const ActivityEditorPage = () => {
     } else {
       sorted.sort((a, b) => a.name.localeCompare(b.name, 'de')); // alphabetical
     }
-    if (!categoryFilter) {
-      return sorted;
-    }
-    return sorted.filter((activity) => activity.categories?.includes(categoryFilter));
-  }, [state.activities, sort, categoryFilter]);
+    return sorted;
+  }, [state.activities, sort]);
 
   const handleCreate = async (values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => {
     await addActivity(values);
@@ -75,7 +63,6 @@ const ActivityEditorPage = () => {
           <Modal triggerLabel="Neue Aktivität" title="Aktivität hinzufügen">
             {(close) => (
               <ActivityForm
-                existingCategories={categories}
                 onSubmit={async (values) => {
                   await handleCreate(values);
                   close();
@@ -85,35 +72,6 @@ const ActivityEditorPage = () => {
           </Modal>
         </div>
       </header>
-      {!!categories.length && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setCategoryFilter(null)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              categoryFilter === null
-                ? 'bg-brand-primary/20 text-brand-secondary'
-                : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-            }`}
-          >
-            Alle
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setCategoryFilter((current) => (current === category ? null : category))}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                categoryFilter === category
-                  ? 'bg-brand-primary/20 text-brand-secondary'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-      )}
       {error && <p className="text-sm text-red-400">{error}</p>}
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -139,20 +97,6 @@ const ActivityEditorPage = () => {
                     <p className="text-xs text-slate-400">
                       {activity.active ? 'Aktiv' : 'Inaktiv'} • Aktualisiert am {new Date(activity.updatedAt).toLocaleDateString('de-DE')}
                     </p>
-                    {activity.categories?.length ? (
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {activity.categories.map((category) => (
-                          <span
-                            key={category}
-                            className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-100"
-                          >
-                            {category}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-500">Keine Kategorien</span>
-                    )}
                     {!!activity.attributes.length && (
                       <div className="text-xs text-slate-400">
                         {activity.attributes.length} Attribute definiert
@@ -185,7 +129,6 @@ const ActivityEditorPage = () => {
                   initialActivity={editing}
                   onSubmit={handleUpdate}
                   onCancel={() => setEditing(null)}
-                  existingCategories={categories}
                 />
                 <div className="flex justify-end">
                   <Button

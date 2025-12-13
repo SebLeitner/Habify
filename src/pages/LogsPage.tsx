@@ -59,6 +59,17 @@ const LogsPage = () => {
 
   const visibleLogs = useMemo(() => state.logs.filter((log) => !isDismissalLog(log)), [state.logs]);
 
+  const formatTimeSlotLabel = (log: LogEntry) => {
+    if (log.timeSlot === 'morning') return 'Morgens';
+    if (log.timeSlot === 'day') return 'Mittags';
+    if (log.timeSlot === 'evening') return 'Abends';
+
+    const hour = new Date(log.timestamp).getHours();
+    if (hour < 12) return 'Morgens';
+    if (hour < 18) return 'Mittags';
+    return 'Abends';
+  };
+
   const filteredLogs = useMemo(() => {
     const start = startOfDay(selectedDate);
     const end = endOfDay(selectedDate);
@@ -211,7 +222,7 @@ const LogsPage = () => {
         dayLines.push('  Aktivitäten:');
         dayLogs.forEach((log) => {
           const activity = activityLookup.get(log.activityId);
-          const timeLabel = format(new Date(log.timestamp), 'HH:mm');
+          const timeLabel = formatTimeSlotLabel(log);
           const baseLine = `${timeLabel} • ${activity?.name ?? 'Aktivität'}${
             log.note ? ` - ${log.note}` : ''
           }`;

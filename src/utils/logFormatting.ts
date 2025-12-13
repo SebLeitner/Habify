@@ -1,11 +1,25 @@
-import type { ActivityAttribute, LogAttributeValue } from '../types';
+import type { ActivityAttribute, LogAttributeValue, LogEntry } from '../types';
 
-export const formatLogTimestamp = (iso: string) => {
-  const date = new Date(iso);
-  return `${date.toLocaleDateString('de-DE')} ${date.toLocaleTimeString('de-DE', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })}`;
+const resolveTimeSlotLabel = (log: Pick<LogEntry, 'timestamp' | 'timeSlot'>) => {
+  const map: Record<NonNullable<LogEntry['timeSlot']>, string> = {
+    morning: 'Morgens',
+    day: 'Mittags',
+    evening: 'Abends',
+  };
+
+  if (log.timeSlot && map[log.timeSlot]) {
+    return map[log.timeSlot];
+  }
+
+  const hour = new Date(log.timestamp).getHours();
+  if (hour < 12) return map.morning;
+  if (hour < 18) return map.day;
+  return map.evening;
+};
+
+export const formatLogTimestamp = (log: Pick<LogEntry, 'timestamp' | 'timeSlot'>) => {
+  const date = new Date(log.timestamp);
+  return `${date.toLocaleDateString('de-DE')} • ${resolveTimeSlotLabel(log)}`;
 };
 
 export const formatAttributeValue = (
