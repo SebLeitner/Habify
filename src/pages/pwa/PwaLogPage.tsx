@@ -33,8 +33,16 @@ type UnifiedEntry =
       note?: string;
     };
 
-const formatTime = (timestamp: string) =>
-  new Date(timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+const formatTimeSlot = (log: Pick<LogEntry, 'timestamp' | 'timeSlot'>) => {
+  if (log.timeSlot === 'morning') return 'Morgens';
+  if (log.timeSlot === 'day') return 'Mittags';
+  if (log.timeSlot === 'evening') return 'Abends';
+
+  const hour = new Date(log.timestamp).getHours();
+  if (hour < 12) return 'Morgens';
+  if (hour < 18) return 'Mittags';
+  return 'Abends';
+};
 
 const formatDateHeading = (dateKey: string) =>
   new Date(dateKey).toLocaleDateString('de-DE', {
@@ -61,7 +69,7 @@ const PwaLogPage = () => {
         timestamp: log.timestamp,
         dateKey,
         title: activity?.name ?? 'Aktivität',
-        meta: `${activity?.icon ?? '📝'} • ${formatTime(log.timestamp)}`,
+        meta: `${activity?.icon ?? '📝'} • ${formatTimeSlot(log)}`,
         note: log.note,
         activityId: log.activityId,
         attributes: log.attributes,

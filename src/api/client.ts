@@ -91,9 +91,6 @@ const normalizeAttributes = (attributes: unknown): ActivityAttribute[] => {
 
 const normalizeActivity = (activity: Activity): Activity => ({
   ...activity,
-  categories: Array.isArray(activity.categories)
-    ? activity.categories.map((category) => category.toString())
-    : [],
   minLogsPerDay: normalizeDailyHabitTargets((activity as Activity).minLogsPerDay),
   attributes: normalizeAttributes((activity as Activity).attributes),
 });

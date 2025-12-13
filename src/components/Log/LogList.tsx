@@ -54,7 +54,7 @@ const LogList = ({
               </span>
               <div>
                 <h3 className="text-base font-semibold text-white">{activity?.name ?? 'Unbekannte Aktivität'}</h3>
-                <p className="text-xs text-slate-400">{formatLogTimestamp(log.timestamp)}</p>
+                <p className="text-xs text-slate-400">{formatLogTimestamp(log)}</p>
                 {log.note && <p className="mt-2 text-sm text-slate-300">{log.note}</p>}
                 {!!log.attributes?.length && (
                   <div className="mt-3 space-y-1 text-xs text-slate-300">

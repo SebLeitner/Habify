@@ -20,7 +20,6 @@ export type Activity = {
   color: string;
   active: boolean;
   minLogsPerDay?: DailyHabitTargets;
-  categories: string[];
   attributes: ActivityAttribute[];
   createdAt: string;
   updatedAt: string;

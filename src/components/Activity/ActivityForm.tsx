@@ -4,7 +4,6 @@ import Input from '../UI/Input';
 import ColorPicker from '../UI/ColorPicker';
 import EmojiPicker from '../UI/EmojiPicker';
 import { Activity } from '../../contexts/DataContext';
-import TagInput from '../UI/TagInput';
 import ActivityAttributesEditor from './ActivityAttributesEditor';
 import type { ActivityAttribute, DailyHabitTargets } from '../../types';
 import { defaultDailyHabitTargets, normalizeDailyHabitTargets } from '../../utils/dailyHabitTargets';
@@ -15,13 +14,11 @@ const ActivityForm = ({
   initialActivity,
   onSubmit,
   onCancel,
-  existingCategories,
   isSubmitting = false,
 }: {
   initialActivity?: Activity;
   onSubmit: (values: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>) => void | Promise<void>;
   onCancel?: () => void;
-  existingCategories: string[];
   isSubmitting?: boolean;
 }) => {
   const [name, setName] = useState(initialActivity?.name ?? '');
@@ -31,7 +28,6 @@ const ActivityForm = ({
   const [minLogsPerDay, setMinLogsPerDay] = useState<DailyHabitTargets>(() =>
     normalizeDailyHabitTargets(initialActivity?.minLogsPerDay),
   );
-  const [categories, setCategories] = useState<string[]>(initialActivity?.categories ?? []);
   const [attributes, setAttributes] = useState<ActivityAttribute[]>(initialActivity?.attributes ?? []);
 
   useEffect(() => {
@@ -41,7 +37,6 @@ const ActivityForm = ({
       setColor(initialActivity.color);
       setActive(initialActivity.active);
       setMinLogsPerDay(normalizeDailyHabitTargets(initialActivity.minLogsPerDay));
-      setCategories(initialActivity.categories ?? []);
       setAttributes(initialActivity.attributes ?? []);
     }
   }, [initialActivity]);
@@ -57,14 +52,13 @@ const ActivityForm = ({
       }))
       .filter((attribute) => attribute.name.length > 0);
 
-    await onSubmit({ name, icon, color, active, minLogsPerDay, categories, attributes: normalizedAttributes });
+    await onSubmit({ name, icon, color, active, minLogsPerDay, attributes: normalizedAttributes });
     if (!initialActivity) {
       setName('');
       setIcon('💧');
       setColor(defaultColor);
       setActive(true);
       setMinLogsPerDay({ ...defaultDailyHabitTargets });
-      setCategories([]);
       setAttributes([]);
     }
   };
@@ -109,13 +103,6 @@ const ActivityForm = ({
           helperText="Wie oft soll die Aktivität abends geloggt werden?"
         />
       </div>
-      <TagInput
-        label="Kategorien"
-        value={categories}
-        onChange={setCategories}
-        placeholder="z. B. Gesundheit, Morgenroutine"
-        suggestions={existingCategories}
-      />
       <ActivityAttributesEditor attributes={attributes} onChange={setAttributes} />
       <label className="flex items-center gap-3 text-sm text-slate-200">
         <input

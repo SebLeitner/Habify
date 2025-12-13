@@ -57,22 +57,6 @@ const respond = (statusCode, body) => ({
   body: body ? JSON.stringify(body) : '',
 });
 
-const ensureCategories = (input) => {
-  if (!input) {
-    return [];
-  }
-
-  if (!Array.isArray(input)) {
-    throw new HttpError(400, 'Kategorien müssen als Array übermittelt werden.');
-  }
-
-  const normalized = input
-    .map((category) => (category ?? '').toString().trim())
-    .filter((category) => category.length > 0);
-
-  return Array.from(new Set(normalized));
-};
-
 const allowedAttributeTypes = new Set(['number', 'text', 'timeRange', 'duration']);
 
 const ensureAttributes = (input) => {
@@ -209,9 +193,6 @@ const sanitizeActivity = (item) => ({
   color: item.color,
   active: item.active !== false,
   minLogsPerDay: ensureMinLogsPerDay(item.minLogsPerDay),
-  categories: Array.isArray(item.categories)
-    ? item.categories.map((category) => category.toString())
-    : [],
   attributes: sanitizeActivityAttributes(item.attributes),
   createdAt: item.createdAt ?? new Date().toISOString(),
   updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
@@ -282,7 +263,6 @@ const addActivity = async (payload) => {
         ? false
         : true,
     minLogsPerDay: ensureMinLogsPerDay(payload?.minLogsPerDay),
-    categories: ensureCategories(payload?.categories),
     attributes: ensureAttributes(payload?.attributes),
     createdAt: now,
     updatedAt: now,
@@ -335,12 +315,6 @@ const updateActivity = async (payload) => {
         : payload.active?.toString() === 'false'
         ? false
         : true;
-  }
-
-  if (payload?.categories !== undefined) {
-    expression.push('#categories = :categories');
-    attributeNames['#categories'] = 'categories';
-    attributeValues[':categories'] = ensureCategories(payload.categories);
   }
 
   if (payload?.attributes !== undefined) {

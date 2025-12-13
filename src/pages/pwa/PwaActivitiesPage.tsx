@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
-import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
+import { endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -285,17 +285,6 @@ const PwaActivitiesPage = () => {
     (activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.evening ?? 0) > 0,
   );
 
-  const formatLastLogLabel = (lastLog: Date | null) => {
-    if (!lastLog) return 'Noch kein Log';
-
-    const daysAgo = differenceInCalendarDays(startOfDay(new Date()), startOfDay(lastLog));
-
-    if (daysAgo === 0) return 'Heute';
-    if (daysAgo === 1) return 'Gestern';
-    if (daysAgo === 2) return 'Vor 2 Tagen';
-    return 'Längere Pause';
-  };
-
   const handleDismissHabit = (activityId: string, slot: keyof DailyHabitTargets) => {
     const target = dailyTargets.get(activityId);
     const remainingInSlot = target?.remainingAfterDismissals[slot] ?? 0;
@@ -373,14 +362,6 @@ const PwaActivitiesPage = () => {
                                 <div className="flex-1 space-y-1">
                                   <div className="flex items-center gap-2">
                                     <p className="text-base font-semibold text-white">{activity.name}</p>
-                                    {activity.categories.some((category) => {
-                                      const normalized = category.toLowerCase();
-                                      return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
-                                    }) && (
-                                      <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
-                                        {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
-                                      </span>
-                                    )}
                                   </div>
                                   <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
                                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
@@ -410,17 +391,6 @@ const PwaActivitiesPage = () => {
                                         )}
                                       </div>
                                     </div>
-                                  )}
-                                  {activity.categories?.length ? (
-                                    <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
-                                      {activity.categories.map((category) => (
-                                        <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
-                                          {category}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
                                   )}
                                 </div>
                               </button>
@@ -465,14 +435,6 @@ const PwaActivitiesPage = () => {
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <p className="text-base font-semibold text-white">{activity.name}</p>
-                          {activity.categories.some((category) => {
-                            const normalized = category.toLowerCase();
-                            return normalized.includes('gesundheit') || normalized.includes('achtsamkeit');
-                          }) && (
-                            <span className="rounded-full bg-brand-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-secondary">
-                              {formatLastLogLabel(activityStats.get(activity.id)?.lastLog ?? null)}
-                            </span>
-                          )}
                         </div>
                         <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
@@ -502,17 +464,6 @@ const PwaActivitiesPage = () => {
                               )}
                             </div>
                           </div>
-                        )}
-                        {activity.categories?.length ? (
-                          <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-slate-400">
-                            {activity.categories.map((category) => (
-                              <span key={category} className="rounded-full bg-slate-800 px-2 py-0.5">
-                                {category}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-[10px] uppercase tracking-wide text-slate-500">Keine Kategorien</span>
                         )}
                       </div>
                     </button>

@@ -29,7 +29,7 @@ const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetail
                   {activity?.name ?? 'Aktivität'}
                 </Dialog.Title>
                 <Dialog.Description className="text-sm text-slate-400">
-                  {formatLogTimestamp(log.timestamp)}
+                  {formatLogTimestamp(log)}
                 </Dialog.Description>
               </div>
             </div>
