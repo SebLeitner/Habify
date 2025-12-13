@@ -22,6 +22,7 @@ import { type DailyHighlight, LogEntry, useData } from '../contexts/DataContext'
 import { formatDateForDisplay, parseDisplayDateToISO } from '../utils/datetime';
 import { isFirefox } from '../utils/browser';
 import { buildPdfPages, downloadPdf, wrapText } from '../utils/pdf';
+import { isDismissalLog } from '../utils/logs';
 
 const LogsPage = () => {
   const { state, deleteLog, deleteHighlight, isLoading, error, updateLog } = useData();
@@ -56,16 +57,18 @@ const LogsPage = () => {
     setFirefoxDatePickerValue(formatDateForDisplay(isoDate));
   }, [firefox, selectedDate]);
 
+  const visibleLogs = useMemo(() => state.logs.filter((log) => !isDismissalLog(log)), [state.logs]);
+
   const filteredLogs = useMemo(() => {
     const start = startOfDay(selectedDate);
     const end = endOfDay(selectedDate);
-    return state.logs
+    return visibleLogs
       .filter((log) => {
         const date = new Date(log.timestamp);
         return date >= start && date <= end;
       })
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  }, [state.logs, selectedDate]);
+  }, [selectedDate, visibleLogs]);
 
   const goToPreviousDay = () => {
     setSelectedDate((current) => startOfDay(addDays(current, -1)));
@@ -169,7 +172,7 @@ const LogsPage = () => {
   const buildDailyLines = (startDate: Date, endDate: Date) => {
     const dayLines: string[] = [];
     const dayList = eachDayOfInterval({ start: startDate, end: endDate });
-    const logsInRange = state.logs
+    const logsInRange = visibleLogs
       .filter((log) =>
         isWithinInterval(new Date(log.timestamp), {
           start: startOfDay(startDate),
@@ -226,7 +229,7 @@ const LogsPage = () => {
 
   const buildWeeklyStats = (startDate: Date, endDate: Date) => {
     const statsLines: string[] = [];
-    const logsInRange = state.logs.filter((log) =>
+    const logsInRange = visibleLogs.filter((log) =>
       isWithinInterval(new Date(log.timestamp), {
         start: startOfDay(startDate),
         end: endOfDay(endDate),
@@ -406,7 +409,7 @@ const LogsPage = () => {
         <LogList
           logs={filteredLogs}
           activities={state.activities}
-          allLogs={state.logs}
+          allLogs={visibleLogs}
           onDelete={handleDelete}
           onEdit={handleEdit}
         />
@@ -435,7 +438,7 @@ const LogsPage = () => {
                   <div className="space-y-4 pt-4">
                     <LogForm
                       activities={state.activities}
-                      logs={state.logs}
+                      logs={visibleLogs}
                       initialLog={editingLog}
                       onSubmit={handleUpdateLog}
                       onCancel={() => setEditingLog(null)}
