@@ -58,6 +58,20 @@ const respond = (statusCode, body) => ({
 });
 
 const allowedAttributeTypes = new Set(['number', 'text', 'timeRange', 'duration']);
+const allowedTimeSlots = new Set(['morning', 'day', 'evening']);
+
+const normalizeTimeSlot = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  const normalized = value.toString();
+  if (!allowedTimeSlots.has(normalized)) {
+    throw new HttpError(400, 'Ungültige Tageszeit.');
+  }
+
+  return normalized;
+};
 
 const ensureAttributes = (input) => {
   if (!input) {
@@ -202,6 +216,7 @@ const sanitizeLog = (item) => ({
   id: item.id,
   activityId: item.activityId,
   timestamp: item.timestamp,
+  timeSlot: allowedTimeSlots.has(item.timeSlot) ? item.timeSlot : undefined,
   note: item.note ?? undefined,
   userId: item.userId,
 });
@@ -425,6 +440,7 @@ const addLog = async (payload) => {
     id: payload?.id?.toString() ?? crypto.randomUUID(),
     activityId,
     timestamp: isoTimestamp,
+    timeSlot: normalizeTimeSlot(payload?.timeSlot),
     note: payload?.note ? payload.note.toString() : undefined,
     userId,
     createdAt: now,
@@ -470,6 +486,8 @@ const updateLog = async (payload) => {
     ? new Date(payload.timestamp.toString()).toISOString()
     : existing.timestamp;
   const nextActivityId = payload?.activityId?.toString() ?? existing.activityId;
+  const nextTimeSlot =
+    payload?.timeSlot === undefined ? existing.timeSlot : normalizeTimeSlot(payload.timeSlot);
   const nextNote =
     payload?.note === undefined ? existing.note : payload.note ? payload.note.toString() : undefined;
   const nextUserId = payload?.userId?.toString() ?? existing.userId;
@@ -487,6 +505,7 @@ const updateLog = async (payload) => {
       ...existing,
       activityId: nextActivityId,
       timestamp: nextTimestamp,
+      timeSlot: nextTimeSlot,
       note: nextNote,
       userId: nextUserId,
       updatedAt,
@@ -510,6 +529,12 @@ const updateLog = async (payload) => {
     expression.push('#activityId = :activityId');
     attributeNames['#activityId'] = 'activityId';
     attributeValues[':activityId'] = nextActivityId;
+  }
+
+  if (nextTimeSlot !== existing.timeSlot) {
+    expression.push('#timeSlot = :timeSlot');
+    attributeNames['#timeSlot'] = 'timeSlot';
+    attributeValues[':timeSlot'] = nextTimeSlot ?? null;
   }
 
   if (payload?.note !== undefined) {
