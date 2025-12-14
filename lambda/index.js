@@ -233,14 +233,19 @@ const sanitizeHighlight = (item) => ({
   updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
 });
 
-const sanitizeMindfulnessActivity = (item) => ({
-  id: item.id,
-  title: item.title ?? '',
-  description: item.description ?? null,
-  date: item.date,
-  createdAt: item.createdAt ?? new Date().toISOString(),
-  updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
-});
+const sanitizeMindfulnessActivity = (item) => {
+  const createdAt = item.createdAt ?? new Date().toISOString();
+  const updatedAt = item.updatedAt ?? item.createdAt ?? new Date().toISOString();
+
+  return {
+    id: item.id,
+    title: item.title ?? '',
+    description: item.description ?? null,
+    ...(item.date ? { date: item.date } : {}),
+    createdAt,
+    updatedAt,
+  };
+};
 
 const normalizeHighlightDate = (raw) => {
   if (!raw) {
@@ -850,7 +855,10 @@ const listMindfulness = async () => {
 
   const items = (result.Items ?? [])
     .map(sanitizeMindfulnessActivity)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt ?? b.createdAt).getTime() - new Date(a.updatedAt ?? a.createdAt).getTime(),
+    );
 
   return respond(200, { items });
 };
@@ -867,14 +875,14 @@ const addMindfulness = async (payload) => {
     throw new HttpError(400, 'Titel der Achtsamkeit ist erforderlich.');
   }
 
-  const date = normalizeHighlightDate(payload?.date);
+  const date = payload?.date ? normalizeHighlightDate(payload.date) : undefined;
   const now = new Date().toISOString();
 
   const item = {
     id: payload?.id?.toString() ?? crypto.randomUUID(),
     title,
     description: description ? description : null,
-    date,
+    ...(date ? { date } : {}),
     createdAt: now,
     updatedAt: now,
   };
