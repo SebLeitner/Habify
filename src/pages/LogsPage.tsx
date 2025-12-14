@@ -231,7 +231,6 @@ const LogsPage = () => {
       if (dayLogs.length) {
         dayLines.push('  Aktivitäten:');
         dayLogs.forEach((log) => {
-          const activity = activityLookup.get(log.activityId);
           const timeLabel = formatTimeSlotLabel(log);
           const logTitle = resolveLogTitle(log);
           const description = log.mindfulnessId ? log.mindfulnessTitle : log.note;
