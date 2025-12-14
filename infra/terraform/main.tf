@@ -419,6 +419,10 @@ locals {
     "/highlights/list",
     "/highlights/update",
     "/highlights/delete",
+    "/mindfulness/add",
+    "/mindfulness/list",
+    "/mindfulness/update",
+    "/mindfulness/delete",
     "/stats/today",
     "/stats/week",
     "/stats/month"
