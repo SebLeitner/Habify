@@ -224,11 +224,9 @@ const PwaActivitiesPage = () => {
     const dailyHabitIds = new Set<string>();
     const daily = activities.filter((activity) => {
       const target = dailyTargets.get(activity.id);
-      const hasLogsToday = (target?.loggedToday ?? 0) > 0;
       const isDaily =
         (target?.totalTarget ?? 0) > 0 &&
-        (target?.totalRemaining ?? 0) > 0 &&
-        !hasLogsToday;
+        (target?.totalRemainingAfterDismissals ?? target?.totalRemaining ?? 0) > 0;
       if (isDaily) {
         dailyHabitIds.add(activity.id);
       }
