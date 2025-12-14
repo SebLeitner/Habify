@@ -184,15 +184,20 @@ const PwaActivitiesPage = () => {
     [state.mindfulness, todayStart],
   );
 
+  const mindfulnessActivityId = useMemo(
+    () => (mindfulnessOfDay ? `mindfulness-${mindfulnessOfDay.id}` : null),
+    [mindfulnessOfDay],
+  );
+
   const hasLoggedMindfulnessToday = useMemo(() => {
     if (!mindfulnessOfDay) return false;
 
     return state.logs.some(
       (log) =>
-        log.mindfulnessId === mindfulnessOfDay.id &&
+        (log.mindfulnessId === mindfulnessOfDay.id || log.activityId === mindfulnessActivityId) &&
         isWithinInterval(new Date(log.timestamp), { start: todayStart, end: todayEnd }),
     );
-  }, [mindfulnessOfDay, state.logs, todayEnd, todayStart]);
+  }, [mindfulnessActivityId, mindfulnessOfDay, state.logs, todayEnd, todayStart]);
 
   useEffect(() => {
     if (!mindfulnessOfDay) {
@@ -204,7 +209,7 @@ const PwaActivitiesPage = () => {
     }
 
     const matchingLogs = state.logs
-      .filter((log) => log.mindfulnessId === mindfulnessOfDay.id)
+      .filter((log) => log.mindfulnessId === mindfulnessOfDay.id || log.activityId === mindfulnessActivityId)
       .map((log) => {
         const parsedTimestamp = new Date(log.timestamp);
         return {
@@ -222,7 +227,7 @@ const PwaActivitiesPage = () => {
       hasLoggedMindfulnessToday,
       matchingLogs,
     });
-  }, [hasLoggedMindfulnessToday, mindfulnessOfDay, state.logs, todayEnd, todayStart]);
+  }, [hasLoggedMindfulnessToday, mindfulnessActivityId, mindfulnessOfDay, state.logs, todayEnd, todayStart]);
 
   const dismissalsForToday = useMemo(() => extractDismissalsForToday(state.logs), [state.logs]);
 
