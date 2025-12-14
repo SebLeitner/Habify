@@ -14,6 +14,7 @@ type DailyTargetInfo = {
   remaining: ReturnType<typeof normalizeDailyHabitTargets>;
   totalTarget: number;
   totalRemaining: number;
+  loggedToday: number;
 };
 
 const ActivitiesPage = () => {
@@ -58,6 +59,7 @@ const ActivitiesPage = () => {
         remaining,
         totalTarget,
         totalRemaining: sumDailyHabitTargets(remaining),
+        loggedToday: loggedToday.morning + loggedToday.day + loggedToday.evening + loggedToday.unslotted,
       });
     });
 
@@ -77,7 +79,11 @@ const ActivitiesPage = () => {
     const dailyHabitIds = new Set<string>();
     const daily = activities.filter((activity) => {
       const target = dailyTargets.get(activity.id);
-      const isDaily = (target?.totalTarget ?? 0) > 0 && (target?.totalRemaining ?? 0) > 0;
+      const hasLogsToday = (target?.loggedToday ?? 0) > 0;
+      const isDaily =
+        (target?.totalTarget ?? 0) > 0 &&
+        (target?.totalRemaining ?? 0) > 0 &&
+        !hasLogsToday;
       if (isDaily) {
         dailyHabitIds.add(activity.id);
       }

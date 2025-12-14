@@ -24,6 +24,7 @@ type DailyTargetInfo = {
   totalTarget: number;
   totalRemaining: number;
   totalRemainingAfterDismissals: number;
+  loggedToday: number;
 };
 
 type ActivityLogFormProps = {
@@ -212,6 +213,7 @@ const PwaActivitiesPage = () => {
         totalTarget,
         totalRemaining: sumDailyHabitTargets(remaining),
         totalRemainingAfterDismissals: sumDailyHabitTargets(remainingAfterDismissals),
+        loggedToday: loggedToday.morning + loggedToday.day + loggedToday.evening + loggedToday.unslotted,
       });
     });
 
@@ -222,7 +224,11 @@ const PwaActivitiesPage = () => {
     const dailyHabitIds = new Set<string>();
     const daily = activities.filter((activity) => {
       const target = dailyTargets.get(activity.id);
-      const isDaily = (target?.totalTarget ?? 0) > 0 && (target?.totalRemaining ?? 0) > 0;
+      const hasLogsToday = (target?.loggedToday ?? 0) > 0;
+      const isDaily =
+        (target?.totalTarget ?? 0) > 0 &&
+        (target?.totalRemaining ?? 0) > 0 &&
+        !hasLogsToday;
       if (isDaily) {
         dailyHabitIds.add(activity.id);
       }
