@@ -22,7 +22,7 @@ const endpointSections = [
   },
   {
     title: 'Achtsamkeit des Tages',
-    description: 'Tägliche Achtsamkeitsaktivitäten mit Datum, Titel und optionaler Beschreibung.',
+    description: 'Tägliche Achtsamkeitsaktivitäten mit Titel und Beschreibung.',
     endpoints: ['/mindfulness/list', '/mindfulness/add', '/mindfulness/update', '/mindfulness/delete'],
   },
 ];
