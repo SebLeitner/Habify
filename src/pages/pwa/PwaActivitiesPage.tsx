@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
@@ -193,6 +193,36 @@ const PwaActivitiesPage = () => {
         isWithinInterval(new Date(log.timestamp), { start: todayStart, end: todayEnd }),
     );
   }, [mindfulnessOfDay, state.logs, todayEnd, todayStart]);
+
+  useEffect(() => {
+    if (!mindfulnessOfDay) {
+      console.debug('[Mindfulness Debug] keine Achtsamkeit des Tages gesetzt (PWA)', {
+        todayStart: todayStart.toISOString(),
+        todayEnd: todayEnd.toISOString(),
+      });
+      return;
+    }
+
+    const matchingLogs = state.logs
+      .filter((log) => log.mindfulnessId === mindfulnessOfDay.id)
+      .map((log) => {
+        const parsedTimestamp = new Date(log.timestamp);
+        return {
+          id: log.id,
+          timestamp: log.timestamp,
+          parsedTimestamp: parsedTimestamp.toISOString(),
+          inTodayRange: isWithinInterval(parsedTimestamp, { start: todayStart, end: todayEnd }),
+        };
+      });
+
+    console.debug('[Mindfulness Debug] hasLoggedMindfulnessToday Check (PWA)', {
+      mindfulnessId: mindfulnessOfDay.id,
+      todayStart: todayStart.toISOString(),
+      todayEnd: todayEnd.toISOString(),
+      hasLoggedMindfulnessToday,
+      matchingLogs,
+    });
+  }, [hasLoggedMindfulnessToday, mindfulnessOfDay, state.logs, todayEnd, todayStart]);
 
   const dismissalsForToday = useMemo(() => extractDismissalsForToday(state.logs), [state.logs]);
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { endOfDay, isWithinInterval, startOfDay } from 'date-fns';
 import ActivityQuickLogList from '../components/Activity/ActivityQuickLogList';
 import Spinner from '../components/UI/Spinner';
@@ -88,6 +88,36 @@ const ActivitiesPage = () => {
         isWithinInterval(new Date(log.timestamp), { start: todayStart, end: todayEnd }),
     );
   }, [mindfulnessOfDay, state.logs, todayEnd, todayStart]);
+
+  useEffect(() => {
+    if (!mindfulnessOfDay) {
+      console.debug('[Mindfulness Debug] keine Achtsamkeit des Tages gesetzt', {
+        todayStart: todayStart.toISOString(),
+        todayEnd: todayEnd.toISOString(),
+      });
+      return;
+    }
+
+    const matchingLogs = state.logs
+      .filter((log) => log.mindfulnessId === mindfulnessOfDay.id)
+      .map((log) => {
+        const parsedTimestamp = new Date(log.timestamp);
+        return {
+          id: log.id,
+          timestamp: log.timestamp,
+          parsedTimestamp: parsedTimestamp.toISOString(),
+          inTodayRange: isWithinInterval(parsedTimestamp, { start: todayStart, end: todayEnd }),
+        };
+      });
+
+    console.debug('[Mindfulness Debug] hasLoggedMindfulnessToday Check', {
+      mindfulnessId: mindfulnessOfDay.id,
+      todayStart: todayStart.toISOString(),
+      todayEnd: todayEnd.toISOString(),
+      hasLoggedMindfulnessToday,
+      matchingLogs,
+    });
+  }, [hasLoggedMindfulnessToday, mindfulnessOfDay, state.logs, todayEnd, todayStart]);
 
   const handleLogMindfulness = async () => {
     if (!mindfulnessOfDay) return;
