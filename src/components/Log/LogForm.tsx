@@ -53,6 +53,7 @@ const LogForm = ({
   });
 
   const selectedActivity = activities.find((activity) => activity.id === activityId) ?? activities[0];
+  const isEditing = Boolean(initialLog);
 
   useEffect(() => {
     setDrafts((current) => {
@@ -80,6 +81,7 @@ const LogForm = ({
 
   const handleSubmit = async (slot: 'morning' | 'day' | 'evening') => {
     if (!activityId || !date) return;
+    setTimeSlot(slot);
     const isoTimestamp = dateToISODate(date);
     const attributeValues = serializeDrafts(drafts);
     setIsSubmitting(true);
@@ -111,6 +113,10 @@ const LogForm = ({
   const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!activityId || !date) return;
+    if (isEditing) {
+      void handleSubmit(timeSlot);
+      return;
+    }
     setIsTimeSlotDialogOpen(true);
   };
 
@@ -154,6 +160,23 @@ const LogForm = ({
         onChange={handleDateChange}
         required
       />
+      {isEditing && (
+        <label className="flex flex-col gap-2 text-sm text-slate-200">
+          <span className="font-medium text-slate-100">Tageszeit</span>
+          <select
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40"
+            value={timeSlot}
+            onChange={(event) =>
+              setTimeSlot(event.target.value as 'morning' | 'day' | 'evening')
+            }
+            required
+          >
+            <option value="morning">Morgens</option>
+            <option value="day">Mittags/Nachmittags</option>
+            <option value="evening">Abends</option>
+          </select>
+        </label>
+      )}
       <AttributeValuesForm attributes={selectedActivity.attributes} drafts={drafts} onChange={setDrafts} />
       {selectedActivity && <WeeklyActivityOverview activityId={selectedActivity.id} logs={logs} />}
       <TextArea label="Notiz" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
