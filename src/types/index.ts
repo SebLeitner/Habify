@@ -69,3 +69,12 @@ export type DailyHighlight = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type MindfulnessActivity = {
+  id: string;
+  title: string;
+  description?: string | null;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+};

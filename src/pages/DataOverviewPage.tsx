@@ -20,6 +20,11 @@ const endpointSections = [
     description: 'Tages-Highlights mit Datum, Titel und Text.',
     endpoints: ['/highlights/list', '/highlights/add', '/highlights/update', '/highlights/delete'],
   },
+  {
+    title: 'Achtsamkeit des Tages',
+    description: 'Tägliche Achtsamkeitsaktivitäten mit Datum, Titel und optionaler Beschreibung.',
+    endpoints: ['/mindfulness/list', '/mindfulness/add', '/mindfulness/update', '/mindfulness/delete'],
+  },
 ];
 
 const DataOverviewPage = () => {
@@ -34,8 +39,9 @@ const DataOverviewPage = () => {
       },
       { key: 'logs', title: `Logbuch (${state.logs.length})`, payload: state.logs },
       { key: 'highlights', title: `Highlights (${state.highlights.length})`, payload: state.highlights },
+      { key: 'mindfulness', title: `Achtsamkeit (${state.mindfulness.length})`, payload: state.mindfulness },
     ],
-    [state.activities, state.highlights, state.logs],
+    [state.activities, state.highlights, state.logs, state.mindfulness],
   );
 
   return (

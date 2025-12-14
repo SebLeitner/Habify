@@ -12,6 +12,7 @@ const {
 const ACTIVITIES_TABLE = process.env.ACTIVITIES_TABLE;
 const LOGS_TABLE = process.env.LOGS_TABLE;
 const HIGHLIGHTS_TABLE = process.env.HIGHLIGHTS_TABLE;
+const MINDFULNESS_TABLE = process.env.MINDFULNESS_TABLE;
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -228,6 +229,15 @@ const sanitizeHighlight = (item) => ({
   text: item.text ?? '',
   photoUrl: item.photoUrl ?? null,
   userId: item.userId,
+  createdAt: item.createdAt ?? new Date().toISOString(),
+  updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
+});
+
+const sanitizeMindfulnessActivity = (item) => ({
+  id: item.id,
+  title: item.title ?? '',
+  description: item.description ?? null,
+  date: item.date,
   createdAt: item.createdAt ?? new Date().toISOString(),
   updatedAt: item.updatedAt ?? item.createdAt ?? new Date().toISOString(),
 });
@@ -827,6 +837,138 @@ const deleteHighlight = async (payload) => {
   return respond(200, { success: true });
 };
 
+const listMindfulness = async () => {
+  if (!MINDFULNESS_TABLE) {
+    throw new HttpError(500, 'Achtsamkeits-Tabelle ist nicht konfiguriert.');
+  }
+
+  const result = await dynamoClient.send(
+    new ScanCommand({
+      TableName: MINDFULNESS_TABLE,
+    }),
+  );
+
+  const items = (result.Items ?? [])
+    .map(sanitizeMindfulnessActivity)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return respond(200, { items });
+};
+
+const addMindfulness = async (payload) => {
+  if (!MINDFULNESS_TABLE) {
+    throw new HttpError(500, 'Achtsamkeits-Tabelle ist nicht konfiguriert.');
+  }
+
+  const title = (payload?.title ?? '').toString().trim();
+  const description = payload?.description?.toString().trim();
+
+  if (!title) {
+    throw new HttpError(400, 'Titel der Achtsamkeit ist erforderlich.');
+  }
+
+  const date = normalizeHighlightDate(payload?.date);
+  const now = new Date().toISOString();
+
+  const item = {
+    id: payload?.id?.toString() ?? crypto.randomUUID(),
+    title,
+    description: description ? description : null,
+    date,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await dynamoClient.send(
+    new PutCommand({
+      TableName: MINDFULNESS_TABLE,
+      Item: item,
+      ConditionExpression: 'attribute_not_exists(id)',
+    }),
+  );
+
+  return respond(201, { item: sanitizeMindfulnessActivity(item) });
+};
+
+const updateMindfulness = async (payload) => {
+  if (!MINDFULNESS_TABLE) {
+    throw new HttpError(500, 'Achtsamkeits-Tabelle ist nicht konfiguriert.');
+  }
+
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Achtsamkeits-ID fehlt.');
+  }
+
+  const expression = ['#updatedAt = :updatedAt'];
+  const attributeNames = { '#updatedAt': 'updatedAt' };
+  const attributeValues = { ':updatedAt': new Date().toISOString() };
+
+  if (payload?.title !== undefined) {
+    const nextTitle = payload.title?.toString().trim();
+    if (!nextTitle) {
+      throw new HttpError(400, 'Titel darf nicht leer sein.');
+    }
+    expression.push('#title = :title');
+    attributeNames['#title'] = 'title';
+    attributeValues[':title'] = nextTitle;
+  }
+
+  if (payload?.description !== undefined) {
+    const nextDescription = payload.description?.toString().trim();
+    expression.push('#description = :description');
+    attributeNames['#description'] = 'description';
+    attributeValues[':description'] = nextDescription ? nextDescription : null;
+  }
+
+  if (payload?.date !== undefined) {
+    const nextDate = normalizeHighlightDate(payload.date);
+    expression.push('#date = :date');
+    attributeNames['#date'] = 'date';
+    attributeValues[':date'] = nextDate;
+  }
+
+  const updateExpression = `SET ${expression.join(', ')}`;
+
+  const result = await dynamoClient.send(
+    new UpdateCommand({
+      TableName: MINDFULNESS_TABLE,
+      Key: { id },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeNames: attributeNames,
+      ExpressionAttributeValues: attributeValues,
+      ConditionExpression: 'attribute_exists(id)',
+      ReturnValues: 'ALL_NEW',
+    }),
+  );
+
+  if (!result.Attributes) {
+    throw new HttpError(404, 'Achtsamkeitsaktivität wurde nicht gefunden.');
+  }
+
+  return respond(200, { item: sanitizeMindfulnessActivity(result.Attributes) });
+};
+
+const deleteMindfulness = async (payload) => {
+  if (!MINDFULNESS_TABLE) {
+    throw new HttpError(500, 'Achtsamkeits-Tabelle ist nicht konfiguriert.');
+  }
+
+  const id = payload?.id?.toString();
+  if (!id) {
+    throw new HttpError(400, 'Achtsamkeits-ID fehlt.');
+  }
+
+  await dynamoClient.send(
+    new DeleteCommand({
+      TableName: MINDFULNESS_TABLE,
+      Key: { id },
+    }),
+  );
+
+  return respond(200, { success: true });
+};
+
 const routeHandlers = {
   '/activities/list': listActivities,
   '/activities/add': addActivity,
@@ -840,6 +982,10 @@ const routeHandlers = {
   '/highlights/add': addHighlight,
   '/highlights/update': updateHighlight,
   '/highlights/delete': deleteHighlight,
+  '/mindfulness/list': listMindfulness,
+  '/mindfulness/add': addMindfulness,
+  '/mindfulness/update': updateMindfulness,
+  '/mindfulness/delete': deleteMindfulness,
 };
 
 exports.handler = async (event) => {

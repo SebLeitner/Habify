@@ -1,4 +1,11 @@
-import type { Activity, ActivityAttribute, DailyHighlight, LogAttributeValue, LogEntry } from '../types';
+import type {
+  Activity,
+  ActivityAttribute,
+  DailyHighlight,
+  LogAttributeValue,
+  LogEntry,
+  MindfulnessActivity,
+} from '../types';
 import { normalizeDailyHabitTargets } from '../utils/dailyHabitTargets';
 import { getEnvValue } from '../utils/runtimeEnv';
 
@@ -16,6 +23,8 @@ type LogsListResponse = { items: LogEntry[] } | LogEntry[];
 type LogResponse = { item: LogEntry } | LogEntry;
 type HighlightsListResponse = { items: DailyHighlight[] } | DailyHighlight[];
 type HighlightResponse = { item: DailyHighlight } | DailyHighlight;
+type MindfulnessListResponse = { items: MindfulnessActivity[] } | MindfulnessActivity[];
+type MindfulnessResponse = { item: MindfulnessActivity } | MindfulnessActivity;
 
 type ListLogsParams = { userId?: string };
 type ListHighlightsParams = { userId?: string; date?: string };
@@ -27,6 +36,8 @@ type UpdateLogPayload = Partial<LogEntry> & { id: string; userId: string };
 type CreateLogPayload = Omit<LogEntry, 'id'> & { id?: string };
 type UpdateHighlightPayload = Partial<DailyHighlight> & { id: string; userId: string };
 type CreateHighlightPayload = Omit<DailyHighlight, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+type UpdateMindfulnessPayload = Partial<MindfulnessActivity> & { id: string };
+type CreateMindfulnessPayload = Omit<MindfulnessActivity, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
@@ -174,6 +185,14 @@ const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
       : highlight.photoUrl.toString(),
 });
 
+const normalizeMindfulnessActivity = (entry: MindfulnessActivity): MindfulnessActivity => ({
+  ...entry,
+  title: (entry.title ?? '').toString(),
+  description:
+    entry.description === undefined || entry.description === null ? null : entry.description.toString(),
+  date: entry.date.toString(),
+});
+
 const extractActivities = (payload: ActivitiesListResponse): Activity[] => {
   if (Array.isArray(payload)) {
     return payload.map(normalizeActivity);
@@ -232,6 +251,26 @@ const extractHighlight = (payload: HighlightResponse): DailyHighlight => {
   }
 
   return normalizeHighlight(payload as DailyHighlight);
+};
+
+const extractMindfulnessEntries = (payload: MindfulnessListResponse): MindfulnessActivity[] => {
+  if (Array.isArray(payload)) {
+    return payload.map(normalizeMindfulnessActivity);
+  }
+
+  if ('items' in payload && Array.isArray(payload.items)) {
+    return payload.items.map(normalizeMindfulnessActivity);
+  }
+
+  return [];
+};
+
+const extractMindfulnessEntry = (payload: MindfulnessResponse): MindfulnessActivity => {
+  if ('item' in payload && payload.item) {
+    return normalizeMindfulnessActivity(payload.item);
+  }
+
+  return normalizeMindfulnessActivity(payload as MindfulnessActivity);
 };
 
 export const listActivities = async (): Promise<Activity[]> => {
@@ -294,4 +333,27 @@ export const updateHighlight = async (payload: UpdateHighlightPayload): Promise<
 
 export const deleteHighlight = async (id: string): Promise<void> => {
   await request({ path: '/highlights/delete', payload: { id } });
+};
+
+export const listMindfulnessEntries = async (): Promise<MindfulnessActivity[]> => {
+  const response = await request<MindfulnessListResponse>({ path: '/mindfulness/list' });
+  return extractMindfulnessEntries(response);
+};
+
+export const createMindfulnessEntry = async (
+  payload: CreateMindfulnessPayload,
+): Promise<MindfulnessActivity> => {
+  const response = await request<MindfulnessResponse>({ path: '/mindfulness/add', payload });
+  return extractMindfulnessEntry(response);
+};
+
+export const updateMindfulnessEntry = async (
+  payload: UpdateMindfulnessPayload,
+): Promise<MindfulnessActivity> => {
+  const response = await request<MindfulnessResponse>({ path: '/mindfulness/update', payload });
+  return extractMindfulnessEntry(response);
+};
+
+export const deleteMindfulnessEntry = async (id: string): Promise<void> => {
+  await request({ path: '/mindfulness/delete', payload: { id } });
 };

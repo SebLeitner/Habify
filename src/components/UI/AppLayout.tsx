@@ -7,6 +7,7 @@ const navItems = [
   { to: '/activities', label: 'Aktivitäten' },
   { to: '/editor', label: 'Editor' },
   { to: '/highlights', label: 'Highlights' },
+  { to: '/mindfulness', label: 'Achtsamkeit' },
   { to: '/logs', label: 'Logbuch' },
   { to: '/data', label: 'Daten' },
   { to: '/stats', label: 'Statistiken' },
