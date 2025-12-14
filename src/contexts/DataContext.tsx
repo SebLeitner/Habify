@@ -21,16 +21,21 @@ import {
   createHighlight,
   updateHighlight as updateHighlightRequest,
   deleteHighlight as deleteHighlightRequest,
+  listMindfulnessEntries,
+  createMindfulnessEntry,
+  updateMindfulnessEntry,
+  deleteMindfulnessEntry,
 } from '../api/client';
-import type { Activity, DailyHighlight, LogEntry } from '../types';
+import type { Activity, DailyHighlight, LogEntry, MindfulnessActivity } from '../types';
 import { useAuth } from './AuthContext';
 
-export type { Activity, LogEntry, DailyHighlight } from '../types';
+export type { Activity, LogEntry, DailyHighlight, MindfulnessActivity } from '../types';
 
 type DataState = {
   activities: Activity[];
   logs: LogEntry[];
   highlights: DailyHighlight[];
+  mindfulness: MindfulnessActivity[];
 };
 
 type Action =
@@ -45,12 +50,17 @@ type Action =
   | { type: 'SET_HIGHLIGHTS'; payload: DailyHighlight[] }
   | { type: 'ADD_HIGHLIGHT'; payload: DailyHighlight }
   | { type: 'UPDATE_HIGHLIGHT'; payload: DailyHighlight }
-  | { type: 'REMOVE_HIGHLIGHT'; payload: string };
+  | { type: 'REMOVE_HIGHLIGHT'; payload: string }
+  | { type: 'SET_MINDFULNESS'; payload: MindfulnessActivity[] }
+  | { type: 'ADD_MINDFULNESS'; payload: MindfulnessActivity }
+  | { type: 'UPDATE_MINDFULNESS'; payload: MindfulnessActivity }
+  | { type: 'REMOVE_MINDFULNESS'; payload: string };
 
 const initialState: DataState = {
   activities: [],
   logs: [],
   highlights: [],
+  mindfulness: [],
 };
 
 const DataContext = createContext<{
@@ -66,6 +76,9 @@ const DataContext = createContext<{
   addHighlight: (input: Omit<DailyHighlight, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateHighlight: (id: string, updates: Partial<DailyHighlight>) => Promise<void>;
   deleteHighlight: (id: string) => Promise<void>;
+  addMindfulness: (input: Omit<MindfulnessActivity, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateMindfulness: (id: string, updates: Partial<MindfulnessActivity>) => Promise<void>;
+  deleteMindfulness: (id: string) => Promise<void>;
   refresh: () => void;
 } | null>(null);
 
@@ -108,6 +121,19 @@ const reducer = (state: DataState, action: Action): DataState => {
       };
     case 'REMOVE_HIGHLIGHT':
       return { ...state, highlights: state.highlights.filter((highlight) => highlight.id !== action.payload) };
+    case 'SET_MINDFULNESS':
+      return { ...state, mindfulness: action.payload };
+    case 'ADD_MINDFULNESS':
+      return { ...state, mindfulness: [...state.mindfulness, action.payload] };
+    case 'UPDATE_MINDFULNESS':
+      return {
+        ...state,
+        mindfulness: state.mindfulness.map((entry) =>
+          entry.id === action.payload.id ? action.payload : entry,
+        ),
+      };
+    case 'REMOVE_MINDFULNESS':
+      return { ...state, mindfulness: state.mindfulness.filter((entry) => entry.id !== action.payload) };
     default:
       return state;
   }
@@ -123,6 +149,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (!user) {
       dispatch({ type: 'SET_ACTIVITIES', payload: [] });
       dispatch({ type: 'SET_LOGS', payload: [] });
+      dispatch({ type: 'SET_HIGHLIGHTS', payload: [] });
+      dispatch({ type: 'SET_MINDFULNESS', payload: [] });
       setError(null);
       setIsLoading(false);
       return;
@@ -130,14 +158,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoading(true);
     try {
-      const [activityResponse, logResponse, highlightsResponse] = await Promise.all([
+      const [activityResponse, logResponse, highlightsResponse, mindfulnessResponse] = await Promise.all([
         listActivities(),
         listLogs({ userId: user.id }),
         listHighlights({ userId: user.id }),
+        listMindfulnessEntries(),
       ]);
       dispatch({ type: 'SET_ACTIVITIES', payload: activityResponse });
       dispatch({ type: 'SET_LOGS', payload: logResponse });
       dispatch({ type: 'SET_HIGHLIGHTS', payload: highlightsResponse });
+      dispatch({ type: 'SET_MINDFULNESS', payload: mindfulnessResponse });
       setError(null);
     } catch (apiError) {
       console.error('Fehler beim Laden der Daten', apiError);
@@ -283,6 +313,42 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const addMindfulness = useCallback(
+    async (input: Omit<MindfulnessActivity, 'id' | 'createdAt' | 'updatedAt'>) => {
+      try {
+        const created = await createMindfulnessEntry(input);
+        dispatch({ type: 'ADD_MINDFULNESS', payload: created });
+      } catch (apiError) {
+        console.error('Achtsamkeitsaktivität konnte nicht erstellt werden', apiError);
+        throw apiError;
+      }
+    },
+    [],
+  );
+
+  const updateMindfulness = useCallback(
+    async (id: string, updates: Partial<MindfulnessActivity>) => {
+      try {
+        const updated = await updateMindfulnessEntry({ id, ...updates });
+        dispatch({ type: 'UPDATE_MINDFULNESS', payload: updated });
+      } catch (apiError) {
+        console.error('Achtsamkeitsaktivität konnte nicht aktualisiert werden', apiError);
+        throw apiError;
+      }
+    },
+    [],
+  );
+
+  const deleteMindfulness = useCallback(async (id: string) => {
+    try {
+      await deleteMindfulnessEntry(id);
+      dispatch({ type: 'REMOVE_MINDFULNESS', payload: id });
+    } catch (apiError) {
+      console.error('Achtsamkeitsaktivität konnte nicht gelöscht werden', apiError);
+      throw apiError;
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       state,
@@ -297,6 +363,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addHighlight,
       updateHighlight,
       deleteHighlight,
+      addMindfulness,
+      updateMindfulness,
+      deleteMindfulness,
       refresh,
     }),
     [
@@ -312,6 +381,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       addHighlight,
       updateHighlight,
       deleteHighlight,
+      addMindfulness,
+      updateMindfulness,
+      deleteMindfulness,
       refresh,
     ],
   );

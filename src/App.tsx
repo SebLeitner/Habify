@@ -4,6 +4,7 @@ import ActivityEditorPage from './pages/ActivityEditorPage';
 import LogsPage from './pages/LogsPage';
 import HighlightsPage from './pages/HighlightsPage';
 import StatsPage from './pages/StatsPage';
+import MindfulnessPage from './pages/MindfulnessPage';
 import LoginPage from './pages/LoginPage';
 import AppLayout from './components/UI/AppLayout';
 import ProtectedRoute from './components/UI/ProtectedRoute';
@@ -79,6 +80,18 @@ const App = () => {
             ) : (
               <ProtectedRoute>
                 <HighlightsPage />
+              </ProtectedRoute>
+            )
+          }
+        />
+        <Route
+          path="/mindfulness"
+          element={
+            shouldRedirectToPwa ? (
+              <Navigate to="/pwa/activities" replace />
+            ) : (
+              <ProtectedRoute>
+                <MindfulnessPage />
               </ProtectedRoute>
             )
           }
