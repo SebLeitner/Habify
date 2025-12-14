@@ -48,6 +48,13 @@ const LogsPage = () => {
     return new Map(state.activities.map((activity) => [activity.id, activity]));
   }, [state.activities]);
 
+  const resolveLogTitle = useMemo(
+    () =>
+      (log: LogEntry) =>
+        log.mindfulnessTitle ?? activityLookup.get(log.activityId)?.name ?? 'Aktivität',
+    [activityLookup],
+  );
+
   useEffect(() => {
     if (!firefox) {
       return;
@@ -148,6 +155,9 @@ const LogsPage = () => {
   };
 
   const handleEdit = (log: LogEntry) => {
+    if (log.mindfulnessId) {
+      return;
+    }
     setLogActionError(null);
     setEditingLog(log);
   };
@@ -223,9 +233,8 @@ const LogsPage = () => {
         dayLogs.forEach((log) => {
           const activity = activityLookup.get(log.activityId);
           const timeLabel = formatTimeSlotLabel(log);
-          const baseLine = `${timeLabel} • ${activity?.name ?? 'Aktivität'}${
-            log.note ? ` - ${log.note}` : ''
-          }`;
+          const logTitle = resolveLogTitle(log);
+          const baseLine = `${timeLabel} • ${logTitle}${log.note ? ` - ${log.note}` : ''}`;
           wrapText(baseLine, 100).forEach((line, index) => {
             dayLines.push(index === 0 ? `- ${line}` : `  ${line}`);
           });

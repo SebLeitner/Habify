@@ -12,7 +12,10 @@ type LogDetailsDialogProps = {
 };
 
 const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetailsDialogProps) => {
-  const accentColor = `${activity?.color ?? '#475569'}33`;
+  const isMindfulnessLog = Boolean(log.mindfulnessId);
+  const accentColor = `${activity?.color ?? (isMindfulnessLog ? '#8b5cf6' : '#475569')}33`;
+  const title = log.mindfulnessTitle ?? activity?.name ?? 'Aktivität';
+  const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📌';
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -22,12 +25,10 @@ const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetail
           <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
             <div className="flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-full text-2xl" style={{ backgroundColor: accentColor }}>
-                {activity?.icon ?? '📌'}
+                {icon}
               </span>
               <div>
-                <Dialog.Title className="text-lg font-semibold text-white">
-                  {activity?.name ?? 'Aktivität'}
-                </Dialog.Title>
+                <Dialog.Title className="text-lg font-semibold text-white">{title}</Dialog.Title>
                 <Dialog.Description className="text-sm text-slate-400">
                   {formatLogTimestamp(log)}
                 </Dialog.Description>
@@ -48,14 +49,14 @@ const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetail
                 className="border border-slate-800 bg-slate-900/60"
               />
             )}
-            {log.note && (
+            {log.note && !isMindfulnessLog && (
               <section className="space-y-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Notiz</h3>
                 <p className="text-base text-slate-100">{log.note}</p>
               </section>
             )}
 
-            {!!log.attributes?.length && (
+            {!!log.attributes?.length && !isMindfulnessLog && (
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Attribute</h3>
                 <div className="space-y-2">
