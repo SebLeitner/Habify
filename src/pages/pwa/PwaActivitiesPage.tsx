@@ -317,7 +317,7 @@ const PwaActivitiesPage = () => {
         activityId: `mindfulness-${mindfulnessOfDay.id}`,
         timestamp: new Date().toISOString(),
         mindfulnessId: mindfulnessOfDay.id,
-        mindfulnessTitle: 'Achtsamkeit des Tages',
+        mindfulnessTitle: mindfulnessOfDay.title,
       });
       setIsMindfulnessDialogOpen(false);
     } catch (apiError) {

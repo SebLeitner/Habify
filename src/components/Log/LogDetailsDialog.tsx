@@ -14,7 +14,7 @@ type LogDetailsDialogProps = {
 const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetailsDialogProps) => {
   const isMindfulnessLog = Boolean(log.mindfulnessId);
   const accentColor = `${activity?.color ?? (isMindfulnessLog ? '#8b5cf6' : '#475569')}33`;
-  const title = log.mindfulnessTitle ?? activity?.name ?? 'Aktivität';
+  const title = log.mindfulnessId ? 'Achtsamkeit des Tages' : activity?.name ?? 'Aktivität';
   const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📌';
 
   return (
@@ -42,6 +42,15 @@ const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetail
           </header>
 
           <div className="space-y-6 px-6 py-5">
+            {isMindfulnessLog && log.mindfulnessTitle && (
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+                  Impuls
+                </h3>
+                <p className="text-base text-slate-100">{log.mindfulnessTitle}</p>
+              </section>
+            )}
+
             {activity && (
               <WeeklyActivityOverview
                 activityId={activity.id}
