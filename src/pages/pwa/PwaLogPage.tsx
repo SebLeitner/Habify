@@ -65,9 +65,8 @@ const PwaLogPage = () => {
       const dateKey = log.timestamp.slice(0, 10);
       const isMindfulnessLog = Boolean(log.mindfulnessId);
       const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📝';
-      const title = isMindfulnessLog
-        ? log.mindfulnessTitle ?? 'Achtsamkeit des Tages'
-        : activity?.name ?? 'Aktivität';
+      const title = isMindfulnessLog ? 'Achtsamkeit des Tages' : activity?.name ?? 'Aktivität';
+      const note = isMindfulnessLog ? log.mindfulnessTitle ?? log.note : log.note;
       return {
         id: `log-${log.id}`,
         type: 'log',
@@ -75,7 +74,7 @@ const PwaLogPage = () => {
         dateKey,
         title,
         meta: `${icon} • ${formatTimeSlot(log)}`,
-        note: log.note,
+        note,
         activityId: log.activityId,
         attributes: log.attributes,
         icon,

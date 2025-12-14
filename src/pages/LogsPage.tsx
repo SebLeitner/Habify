@@ -51,7 +51,7 @@ const LogsPage = () => {
   const resolveLogTitle = useMemo(
     () =>
       (log: LogEntry) =>
-        log.mindfulnessTitle ?? activityLookup.get(log.activityId)?.name ?? 'Aktivität',
+        log.mindfulnessId ? 'Achtsamkeit des Tages' : activityLookup.get(log.activityId)?.name ?? 'Aktivität',
     [activityLookup],
   );
 
@@ -234,7 +234,8 @@ const LogsPage = () => {
           const activity = activityLookup.get(log.activityId);
           const timeLabel = formatTimeSlotLabel(log);
           const logTitle = resolveLogTitle(log);
-          const baseLine = `${timeLabel} • ${logTitle}${log.note ? ` - ${log.note}` : ''}`;
+          const description = log.mindfulnessId ? log.mindfulnessTitle : log.note;
+          const baseLine = `${timeLabel} • ${logTitle}${description ? ` - ${description}` : ''}`;
           wrapText(baseLine, 100).forEach((line, index) => {
             dayLines.push(index === 0 ? `- ${line}` : `  ${line}`);
           });
