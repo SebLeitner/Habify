@@ -29,7 +29,7 @@ import {
 } from '../api/client';
 import type { Activity, DailyHabitTargets, DailyHighlight, LogEntry, MindfulnessActivity } from '../types';
 import { useAuth } from './AuthContext';
-import { calculateRemainingTargets, normalizeDailyHabitTargets } from '../utils/dailyHabitTargets';
+import { normalizeDailyHabitTargets } from '../utils/dailyHabitTargets';
 import { isDismissalLog } from '../utils/logs';
 
 export type { Activity, LogEntry, DailyHighlight, MindfulnessActivity } from '../types';
@@ -195,13 +195,13 @@ const resolveDailyHabitTimeSlot = (
     evening: Math.max(target.evening - counts.evening, 0),
   };
 
-  const remaining = calculateRemainingTargets(remainingAfterSlotted, counts.unslotted);
-
-  if (remaining[requestedSlot] > 0) {
+  if (remainingAfterSlotted[requestedSlot] > 0) {
     return requestedSlot;
   }
 
-  const fallbackSlot = (['morning', 'day', 'evening'] as const).find((slot) => remaining[slot] > 0);
+  const fallbackSlot = (['morning', 'day', 'evening'] as const).find(
+    (slot) => remainingAfterSlotted[slot] > 0,
+  );
 
   return fallbackSlot ?? requestedSlot;
 };
