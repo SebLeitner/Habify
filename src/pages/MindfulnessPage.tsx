@@ -4,13 +4,10 @@ import Input from '../components/UI/Input';
 import TextArea from '../components/UI/TextArea';
 import { useData } from '../contexts/DataContext';
 
-const todayAsString = () => new Date().toISOString().slice(0, 10);
-
 const MindfulnessPage = () => {
   const { state, addMindfulness, updateMindfulness, deleteMindfulness, isLoading, error } = useData();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(todayAsString());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,7 +15,6 @@ const MindfulnessPage = () => {
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setDate(todayAsString());
     setEditingId(null);
     setFormError(null);
   };
@@ -27,7 +23,10 @@ const MindfulnessPage = () => {
     () =>
       state.mindfulness
         .slice()
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt ?? b.createdAt).getTime() - new Date(a.updatedAt ?? a.createdAt).getTime(),
+        ),
     [state.mindfulness],
   );
 
@@ -41,8 +40,8 @@ const MindfulnessPage = () => {
       return;
     }
 
-    if (!date) {
-      setFormError('Bitte wähle ein Datum aus.');
+    if (!trimmedDescription) {
+      setFormError('Bitte ergänze eine Beschreibung.');
       return;
     }
 
@@ -52,14 +51,12 @@ const MindfulnessPage = () => {
       if (editingId) {
         await updateMindfulness(editingId, {
           title: trimmedTitle,
-          description: trimmedDescription || null,
-          date,
+          description: trimmedDescription,
         });
       } else {
         await addMindfulness({
           title: trimmedTitle,
-          description: trimmedDescription || null,
-          date,
+          description: trimmedDescription,
         });
       }
       resetForm();
@@ -79,7 +76,6 @@ const MindfulnessPage = () => {
     if (!entry) return;
     setTitle(entry.title ?? '');
     setDescription(entry.description ?? '');
-    setDate(entry.date);
     setEditingId(entry.id);
     setFormError(null);
   };
@@ -105,7 +101,7 @@ const MindfulnessPage = () => {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold text-white">Achtsamkeit des Tages</h1>
         <p className="text-sm text-slate-400">
-          Sammle tägliche Achtsamkeitsimpulse und halte fest, worauf du deinen Fokus richten möchtest.
+          Achtsamkeitsimpulse für den Tag
         </p>
       </header>
 
@@ -117,28 +113,20 @@ const MindfulnessPage = () => {
           {editingId ? 'Achtsamkeit bearbeiten' : 'Neue Achtsamkeit anlegen'}
         </h2>
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              label="Titel"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="z. B. Atembeobachtung"
-              required
-            />
-            <Input
-              label="Datum"
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              required
-            />
-          </div>
+          <Input
+            label="Titel"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="z. B. Atembeobachtung"
+            required
+          />
           <TextArea
-            label="Beschreibung (optional)"
+            label="Beschreibung"
             rows={4}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Notiere Details, Anweisungen oder eine Affirmation."
+            required
           />
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={isSubmitting}>
@@ -174,7 +162,6 @@ const MindfulnessPage = () => {
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-wide text-brand-secondary">{entry.date}</p>
                     <h3 className="text-base font-semibold text-white">{entry.title}</h3>
                     {entry.description && <p className="text-sm text-slate-300">{entry.description}</p>}
                   </div>

@@ -185,13 +185,16 @@ const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
       : highlight.photoUrl.toString(),
 });
 
-const normalizeMindfulnessActivity = (entry: MindfulnessActivity): MindfulnessActivity => ({
-  ...entry,
-  title: (entry.title ?? '').toString(),
-  description:
-    entry.description === undefined || entry.description === null ? null : entry.description.toString(),
-  date: entry.date.toString(),
-});
+const normalizeMindfulnessActivity = (entry: MindfulnessActivity): MindfulnessActivity => {
+  const rest = { ...entry } as MindfulnessActivity & { date?: string };
+  delete rest.date;
+
+  return {
+    ...rest,
+    title: (entry.title ?? '').toString(),
+    description: (entry.description ?? '').toString(),
+  };
+};
 
 const extractActivities = (payload: ActivitiesListResponse): Activity[] => {
   if (Array.isArray(payload)) {
