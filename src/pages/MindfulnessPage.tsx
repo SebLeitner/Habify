@@ -161,10 +161,7 @@ const MindfulnessPage = () => {
                 className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 shadow-inner shadow-black/20"
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-white">{entry.title}</h3>
-                    {entry.description && <p className="text-sm text-slate-300">{entry.description}</p>}
-                  </div>
+                  <h3 className="text-base font-semibold text-white">{entry.title}</h3>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"

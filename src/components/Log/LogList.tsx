@@ -35,7 +35,9 @@ const LogList = ({
         const activity = activityById.get(log.activityId);
         const isMindfulnessLog = Boolean(log.mindfulnessId);
         const accentColor = `${activity?.color ?? (isMindfulnessLog ? '#8b5cf6' : '#475569')}33`;
-        const title = log.mindfulnessTitle ?? activity?.name ?? 'Unbekannte Aktivität';
+        const title = isMindfulnessLog
+          ? log.mindfulnessTitle ?? 'Achtsamkeit des Tages'
+          : activity?.name ?? 'Unbekannte Aktivität';
         const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📌';
         return (
           <div
