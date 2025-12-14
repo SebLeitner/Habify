@@ -178,7 +178,7 @@ const LogForm = ({
             <div className="grid gap-3 sm:grid-cols-3">
               {[
                 { key: 'morning', label: 'Morgens' },
-                { key: 'day', label: 'Mittags' },
+                { key: 'day', label: 'Mittags/Nachmittags' },
                 { key: 'evening', label: 'Abends' },
               ].map((slot) => (
                 <Button
