@@ -6,7 +6,7 @@ import Button from '../../components/UI/Button';
 import { useData } from '../../contexts/DataContext';
 import { formatAttributeValue } from '../../utils/logFormatting';
 import type { LogEntry } from '../../types';
-import { isDismissalLog } from '../../utils/logs';
+import { isDismissalLog, isMindfulnessLog } from '../../utils/logs';
 
 type UnifiedEntry =
   | {
@@ -63,10 +63,10 @@ const PwaLogPage = () => {
     const logEntries: UnifiedEntry[] = visibleLogs.map((log) => {
       const activity = activityLookup.get(log.activityId);
       const dateKey = log.timestamp.slice(0, 10);
-      const isMindfulnessLog = Boolean(log.mindfulnessId);
-      const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📝';
-      const title = isMindfulnessLog ? 'Achtsamkeit des Tages' : activity?.name ?? 'Aktivität';
-      const note = isMindfulnessLog ? log.mindfulnessTitle ?? log.note : log.note;
+      const mindfulnessLog = isMindfulnessLog(log);
+      const icon = mindfulnessLog ? '🧘' : activity?.icon ?? '📝';
+      const title = mindfulnessLog ? 'Achtsamkeit des Tages' : activity?.name ?? 'Aktivität';
+      const note = mindfulnessLog ? log.mindfulnessTitle ?? log.note : log.note;
       return {
         id: `log-${log.id}`,
         type: 'log',

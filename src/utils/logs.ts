@@ -7,3 +7,6 @@ export const isDismissalLog = (log: LogEntry): log is LogEntry & { note: string 
   (['morning', 'day', 'evening'] as Array<keyof DailyHabitTargets>).some(
     (slot) => log.note === `${DISMISS_NOTE_PREFIX}${slot}`,
   );
+
+export const isMindfulnessLog = (log: LogEntry): boolean =>
+  Boolean(log.mindfulnessId || log.activityId?.startsWith('mindfulness-'));
