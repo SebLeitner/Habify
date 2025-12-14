@@ -32,6 +32,8 @@ type DailyTargetInfo = {
   totalRemaining: number;
 };
 
+const getCompletedCount = (target: number, remaining: number): number => Math.max(target - remaining, 0);
+
 const ActivityCard = ({
   activity,
   onAddLog,
@@ -171,17 +173,20 @@ const ActivityCard = ({
                 <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                   {dailyTarget.target.morning > 0 && (
                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Morgens: {dailyTarget.remaining.morning}/{dailyTarget.target.morning}
+                      Morgens: {getCompletedCount(dailyTarget.target.morning, dailyTarget.remaining.morning)}/
+                      {dailyTarget.target.morning}
                     </span>
                   )}
                   {dailyTarget.target.day > 0 && (
                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Mittags/Nachmittags: {dailyTarget.remaining.day}/{dailyTarget.target.day}
+                      Mittags/Nachmittags: {getCompletedCount(dailyTarget.target.day, dailyTarget.remaining.day)}/
+                      {dailyTarget.target.day}
                     </span>
                   )}
                   {dailyTarget.target.evening > 0 && (
                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Abend: {dailyTarget.remaining.evening}/{dailyTarget.target.evening}
+                      Abend: {getCompletedCount(dailyTarget.target.evening, dailyTarget.remaining.evening)}/
+                      {dailyTarget.target.evening}
                     </span>
                   )}
                 </div>

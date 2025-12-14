@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useMemo, useState } from 'react';
-import { endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
+import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
 import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -32,6 +32,20 @@ type ActivityLogFormProps = {
   onContinue: (values: { timestamp: string; note?: string }) => void;
   onClose: () => void;
   logs: LogEntry[];
+};
+
+const getCompletedCount = (target: number, remaining: number): number => Math.max(target - remaining, 0);
+
+const getRecencyBadgeLabel = (lastLog: Date | null): string => {
+  if (!lastLog) return 'X';
+
+  const daysSinceLastLog = differenceInCalendarDays(startOfDay(new Date()), startOfDay(lastLog));
+
+  if (daysSinceLastLog === 0) return 'HEUTE';
+  if (daysSinceLastLog === 1) return 'GESTERN';
+  if (daysSinceLastLog === 2) return '2 TAGE';
+  if (daysSinceLastLog === 3) return '3 TAGE';
+  return 'X';
 };
 
 const ActivityLogForm = ({ activity, onContinue, onClose, logs }: ActivityLogFormProps) => {
@@ -396,17 +410,32 @@ const PwaActivitiesPage = () => {
                                       <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                                         {dailyTarget.target.morning > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Morgens: {dailyTarget.remainingAfterDismissals.morning}/{dailyTarget.target.morning}
+                                            Morgens:{' '}
+                                            {getCompletedCount(
+                                              dailyTarget.target.morning,
+                                              dailyTarget.remainingAfterDismissals.morning,
+                                            )}
+                                            /{dailyTarget.target.morning}
                                           </span>
                                         )}
                                         {dailyTarget.target.day > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Mittags/Nachmittags: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
+                                            Mittags/Nachmittags:{' '}
+                                            {getCompletedCount(
+                                              dailyTarget.target.day,
+                                              dailyTarget.remainingAfterDismissals.day,
+                                            )}
+                                            /{dailyTarget.target.day}
                                           </span>
                                         )}
                                         {dailyTarget.target.evening > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Abend: {dailyTarget.remainingAfterDismissals.evening}/{dailyTarget.target.evening}
+                                            Abend:{' '}
+                                            {getCompletedCount(
+                                              dailyTarget.target.evening,
+                                              dailyTarget.remainingAfterDismissals.evening,
+                                            )}
+                                            /{dailyTarget.target.evening}
                                           </span>
                                         )}
                                       </div>
@@ -414,13 +443,18 @@ const PwaActivitiesPage = () => {
                                   )}
                                 </div>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDismissHabit(activity.id, section.key)}
-                                className="rounded-lg border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
-                              >
-                                Pausieren
-                              </button>
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                                  {getRecencyBadgeLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDismissHabit(activity.id, section.key)}
+                                  className="rounded-lg border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+                                >
+                                  Pausieren
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -469,17 +503,32 @@ const PwaActivitiesPage = () => {
                             <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
                               {dailyTarget.target.morning > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Morgens: {dailyTarget.remainingAfterDismissals.morning}/{dailyTarget.target.morning}
+                                  Morgens:{' '}
+                                  {getCompletedCount(
+                                    dailyTarget.target.morning,
+                                    dailyTarget.remainingAfterDismissals.morning,
+                                  )}
+                                  /{dailyTarget.target.morning}
                                 </span>
                               )}
                               {dailyTarget.target.day > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Mittags/Nachmittags: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
+                                  Mittags/Nachmittags:{' '}
+                                  {getCompletedCount(
+                                    dailyTarget.target.day,
+                                    dailyTarget.remainingAfterDismissals.day,
+                                  )}
+                                  /{dailyTarget.target.day}
                                 </span>
                               )}
                               {dailyTarget.target.evening > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Abend: {dailyTarget.remainingAfterDismissals.evening}/{dailyTarget.target.evening}
+                                  Abend:{' '}
+                                  {getCompletedCount(
+                                    dailyTarget.target.evening,
+                                    dailyTarget.remainingAfterDismissals.evening,
+                                  )}
+                                  /{dailyTarget.target.evening}
                                 </span>
                               )}
                             </div>
