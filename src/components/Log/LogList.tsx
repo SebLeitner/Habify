@@ -33,7 +33,10 @@ const LogList = ({
     <div className="space-y-3">
       {logs.map((log) => {
         const activity = activityById.get(log.activityId);
-        const accentColor = `${activity?.color ?? '#475569'}33`;
+        const isMindfulnessLog = Boolean(log.mindfulnessId);
+        const accentColor = `${activity?.color ?? (isMindfulnessLog ? '#8b5cf6' : '#475569')}33`;
+        const title = log.mindfulnessTitle ?? activity?.name ?? 'Unbekannte Aktivität';
+        const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📌';
         return (
           <div
             key={log.id}
@@ -50,13 +53,15 @@ const LogList = ({
           >
             <div className="flex items-center gap-4">
               <span className="flex h-12 w-12 items-center justify-center rounded-full text-2xl" style={{ backgroundColor: accentColor }}>
-                {activity?.icon ?? '📌'}
+                {icon}
               </span>
               <div>
-                <h3 className="text-base font-semibold text-white">{activity?.name ?? 'Unbekannte Aktivität'}</h3>
+                <h3 className="text-base font-semibold text-white">{title}</h3>
                 <p className="text-xs text-slate-400">{formatLogTimestamp(log)}</p>
-                {log.note && <p className="mt-2 text-sm text-slate-300">{log.note}</p>}
-                {!!log.attributes?.length && (
+                {log.note && !isMindfulnessLog && (
+                  <p className="mt-2 text-sm text-slate-300">{log.note}</p>
+                )}
+                {!!log.attributes?.length && !isMindfulnessLog && (
                   <div className="mt-3 space-y-1 text-xs text-slate-300">
                     {log.attributes.map((attributeValue) => {
                       const activityAttribute = activity?.attributes.find(
@@ -81,7 +86,7 @@ const LogList = ({
             </div>
             {(onEdit || onDelete) && (
               <div className="flex gap-2">
-                {onEdit && (
+                {onEdit && !isMindfulnessLog && (
                   <Button
                     type="button"
                     variant="ghost"

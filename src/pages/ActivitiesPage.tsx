@@ -8,6 +8,8 @@ import {
   normalizeDailyHabitTargets,
   sumDailyHabitTargets,
 } from '../utils/dailyHabitTargets';
+import MindfulnessOfDayCard from '../components/Mindfulness/MindfulnessOfDayCard';
+import { selectMindfulnessOfDay } from '../utils/mindfulness';
 
 type DailyTargetInfo = {
   target: ReturnType<typeof normalizeDailyHabitTargets>;
@@ -20,6 +22,9 @@ type DailyTargetInfo = {
 const ActivitiesPage = () => {
   const { state, addLog, isLoading, error } = useData();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMindfulnessDialogOpen, setIsMindfulnessDialogOpen] = useState(false);
+  const [mindfulnessError, setMindfulnessError] = useState<string | null>(null);
+  const [isLoggingMindfulness, setIsLoggingMindfulness] = useState(false);
 
   const dailyTargets = useMemo(() => {
     const todayStart = startOfDay(new Date());
@@ -66,6 +71,45 @@ const ActivitiesPage = () => {
     return targets;
   }, [state.activities, state.logs]);
 
+  const todayStart = startOfDay(new Date());
+  const todayEnd = endOfDay(new Date());
+
+  const mindfulnessOfDay = useMemo(() => selectMindfulnessOfDay(state.mindfulness, todayStart), [
+    state.mindfulness,
+    todayStart,
+  ]);
+
+  const hasLoggedMindfulnessToday = useMemo(() => {
+    if (!mindfulnessOfDay) return false;
+
+    return state.logs.some(
+      (log) =>
+        log.mindfulnessId === mindfulnessOfDay.id &&
+        isWithinInterval(new Date(log.timestamp), { start: todayStart, end: todayEnd }),
+    );
+  }, [mindfulnessOfDay, state.logs, todayEnd, todayStart]);
+
+  const handleLogMindfulness = async () => {
+    if (!mindfulnessOfDay) return;
+    setMindfulnessError(null);
+    setIsLoggingMindfulness(true);
+    try {
+      await addLog({
+        activityId: `mindfulness-${mindfulnessOfDay.id}`,
+        timestamp: new Date().toISOString(),
+        mindfulnessId: mindfulnessOfDay.id,
+        mindfulnessTitle: mindfulnessOfDay.title,
+      });
+      setIsMindfulnessDialogOpen(false);
+    } catch (apiError) {
+      const message =
+        apiError instanceof Error ? apiError.message : 'Achtsamkeit konnte nicht gespeichert werden.';
+      setMindfulnessError(message);
+    } finally {
+      setIsLoggingMindfulness(false);
+    }
+  };
+
   const activities = useMemo(() => {
     return state.activities
       .filter((activity) => {
@@ -103,6 +147,16 @@ const ActivitiesPage = () => {
 
   return (
     <div className="space-y-6">
+      {!hasLoggedMindfulnessToday && mindfulnessOfDay && (
+        <MindfulnessOfDayCard
+          entry={mindfulnessOfDay}
+          open={isMindfulnessDialogOpen}
+          onOpenChange={setIsMindfulnessDialogOpen}
+          onLog={handleLogMindfulness}
+          isLogging={isLoggingMindfulness}
+          error={mindfulnessError}
+        />
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <input
           value={searchTerm}

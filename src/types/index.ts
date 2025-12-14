@@ -56,6 +56,8 @@ export type LogEntry = {
   timeSlot?: 'morning' | 'day' | 'evening';
   note?: string;
   attributes?: LogAttributeValue[];
+  mindfulnessId?: string;
+  mindfulnessTitle?: string;
   userId: string;
 };
 
