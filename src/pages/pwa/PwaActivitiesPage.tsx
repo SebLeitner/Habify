@@ -16,6 +16,8 @@ import {
   sumDailyHabitTargets,
 } from '../../utils/dailyHabitTargets';
 import { DISMISS_NOTE_PREFIX, isDismissalLog } from '../../utils/logs';
+import MindfulnessOfDayCard from '../../components/Mindfulness/MindfulnessOfDayCard';
+import { selectMindfulnessOfDay } from '../../utils/mindfulness';
 
 type DailyTargetInfo = {
   target: ReturnType<typeof normalizeDailyHabitTargets>;
@@ -170,6 +172,27 @@ const PwaActivitiesPage = () => {
     note?: string;
   } | null>(null);
   const [isTimeSlotSaving, setIsTimeSlotSaving] = useState(false);
+  const [isMindfulnessDialogOpen, setIsMindfulnessDialogOpen] = useState(false);
+  const [mindfulnessError, setMindfulnessError] = useState<string | null>(null);
+  const [isLoggingMindfulness, setIsLoggingMindfulness] = useState(false);
+
+  const todayStart = startOfDay(new Date());
+  const todayEnd = endOfDay(new Date());
+
+  const mindfulnessOfDay = useMemo(
+    () => selectMindfulnessOfDay(state.mindfulness, todayStart),
+    [state.mindfulness, todayStart],
+  );
+
+  const hasLoggedMindfulnessToday = useMemo(() => {
+    if (!mindfulnessOfDay) return false;
+
+    return state.logs.some(
+      (log) =>
+        log.mindfulnessId === mindfulnessOfDay.id &&
+        isWithinInterval(new Date(log.timestamp), { start: todayStart, end: todayEnd }),
+    );
+  }, [mindfulnessOfDay, state.logs, todayEnd, todayStart]);
 
   const dismissalsForToday = useMemo(() => extractDismissalsForToday(state.logs), [state.logs]);
 
@@ -285,6 +308,27 @@ const PwaActivitiesPage = () => {
     (activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.evening ?? 0) > 0,
   );
 
+  const handleLogMindfulness = async () => {
+    if (!mindfulnessOfDay) return;
+    setMindfulnessError(null);
+    setIsLoggingMindfulness(true);
+    try {
+      await addLog({
+        activityId: `mindfulness-${mindfulnessOfDay.id}`,
+        timestamp: new Date().toISOString(),
+        mindfulnessId: mindfulnessOfDay.id,
+        mindfulnessTitle: 'Achtsamkeit des Tages',
+      });
+      setIsMindfulnessDialogOpen(false);
+    } catch (apiError) {
+      const message =
+        apiError instanceof Error ? apiError.message : 'Achtsamkeit konnte nicht gespeichert werden.';
+      setMindfulnessError(message);
+    } finally {
+      setIsLoggingMindfulness(false);
+    }
+  };
+
   const handleDismissHabit = (activityId: string, slot: keyof DailyHabitTargets) => {
     const target = dailyTargets.get(activityId);
     const remainingInSlot = target?.remainingAfterDismissals[slot] ?? 0;
@@ -348,6 +392,16 @@ const PwaActivitiesPage = () => {
 
   return (
     <div className="space-y-4">
+      {!hasLoggedMindfulnessToday && mindfulnessOfDay && (
+        <MindfulnessOfDayCard
+          entry={mindfulnessOfDay}
+          open={isMindfulnessDialogOpen}
+          onOpenChange={setIsMindfulnessDialogOpen}
+          onLog={handleLogMindfulness}
+          isLogging={isLoggingMindfulness}
+          error={mindfulnessError}
+        />
+      )}
       {error && <p className="text-sm text-red-400">{error}</p>}
       {actionError && <p className="text-sm text-red-400">{actionError}</p>}
       {isLoading ? (

@@ -63,17 +63,22 @@ const PwaLogPage = () => {
     const logEntries: UnifiedEntry[] = visibleLogs.map((log) => {
       const activity = activityLookup.get(log.activityId);
       const dateKey = log.timestamp.slice(0, 10);
+      const isMindfulnessLog = Boolean(log.mindfulnessId);
+      const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📝';
+      const title = isMindfulnessLog
+        ? log.mindfulnessTitle ?? 'Achtsamkeit des Tages'
+        : activity?.name ?? 'Aktivität';
       return {
         id: `log-${log.id}`,
         type: 'log',
         timestamp: log.timestamp,
         dateKey,
-        title: activity?.name ?? 'Aktivität',
-        meta: `${activity?.icon ?? '📝'} • ${formatTimeSlot(log)}`,
+        title,
+        meta: `${icon} • ${formatTimeSlot(log)}`,
         note: log.note,
         activityId: log.activityId,
         attributes: log.attributes,
-        icon: activity?.icon,
+        icon,
         userId: log.userId,
         logId: log.id,
       };
