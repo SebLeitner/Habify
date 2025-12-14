@@ -115,3 +115,12 @@ echo "Cognito:"
 echo "  - User Pool ID:        $COGNITO_POOL_ID"
 echo "  - Client ID:           $COGNITO_CLIENT_ID"
 echo "─────────────────────────────────────────────"
+
+echo ""
+echo "----------------------------------------------"
+echo "Speichern des TFState"
+echo "----------------------------------------------"
+
+git add infra/terraform/terraform.tfstate
+git commit -m "Terraform tfstate"
+git push
