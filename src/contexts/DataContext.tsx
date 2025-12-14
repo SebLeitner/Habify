@@ -8,6 +8,7 @@ import {
   useReducer,
   useState,
 } from 'react';
+import { endOfDay, isWithinInterval, startOfDay } from 'date-fns';
 import {
   createActivity,
   deleteActivity as deleteActivityRequest,
@@ -26,8 +27,10 @@ import {
   updateMindfulnessEntry,
   deleteMindfulnessEntry,
 } from '../api/client';
-import type { Activity, DailyHighlight, LogEntry, MindfulnessActivity } from '../types';
+import type { Activity, DailyHabitTargets, DailyHighlight, LogEntry, MindfulnessActivity } from '../types';
 import { useAuth } from './AuthContext';
+import { calculateRemainingTargets, normalizeDailyHabitTargets } from '../utils/dailyHabitTargets';
+import { isDismissalLog } from '../utils/logs';
 
 export type { Activity, LogEntry, DailyHighlight, MindfulnessActivity } from '../types';
 
@@ -139,6 +142,70 @@ const reducer = (state: DataState, action: Action): DataState => {
   }
 };
 
+const resolveDailyHabitTimeSlot = (
+  activity: Activity | undefined,
+  timestamp: string,
+  requestedSlot: LogEntry['timeSlot'],
+  existingLogs: LogEntry[],
+): LogEntry['timeSlot'] => {
+  if (!activity || !requestedSlot) {
+    return requestedSlot;
+  }
+
+  const target = normalizeDailyHabitTargets(activity.minLogsPerDay);
+  if (target.morning + target.day + target.evening <= 0) {
+    return requestedSlot;
+  }
+
+  const start = startOfDay(new Date(timestamp));
+  const end = endOfDay(new Date(timestamp));
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return requestedSlot;
+  }
+
+  const dailyLogs = existingLogs.filter((log) => {
+    if (log.activityId !== activity.id || isDismissalLog(log)) {
+      return false;
+    }
+
+    const logDate = new Date(log.timestamp);
+    return isWithinInterval(logDate, { start, end });
+  });
+
+  const counts: DailyHabitTargets & { unslotted: number } = {
+    morning: 0,
+    day: 0,
+    evening: 0,
+    unslotted: 0,
+  };
+
+  dailyLogs.forEach((log) => {
+    const slot = log.timeSlot;
+    if (slot && ['morning', 'day', 'evening'].includes(slot)) {
+      counts[slot as keyof DailyHabitTargets] += 1;
+    } else {
+      counts.unslotted += 1;
+    }
+  });
+
+  const remainingAfterSlotted: DailyHabitTargets = {
+    morning: Math.max(target.morning - counts.morning, 0),
+    day: Math.max(target.day - counts.day, 0),
+    evening: Math.max(target.evening - counts.evening, 0),
+  };
+
+  const remaining = calculateRemainingTargets(remainingAfterSlotted, counts.unslotted);
+
+  if (remaining[requestedSlot] > 0) {
+    return requestedSlot;
+  }
+
+  const fallbackSlot = (['morning', 'day', 'evening'] as const).find((slot) => remaining[slot] > 0);
+
+  return fallbackSlot ?? requestedSlot;
+};
+
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -232,14 +299,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     async (input: Omit<LogEntry, 'id' | 'userId'>) => {
       if (!user) throw new Error('Nicht angemeldet');
       try {
-        const created = await createLog({ ...input, userId: user.id });
+        const activity = state.activities.find((item) => item.id === input.activityId);
+        const resolvedSlot = resolveDailyHabitTimeSlot(activity, input.timestamp, input.timeSlot, state.logs);
+        const created = await createLog({ ...input, userId: user.id, timeSlot: resolvedSlot });
         dispatch({ type: 'ADD_LOG', payload: created });
       } catch (apiError) {
         console.error('Log-Eintrag konnte nicht erstellt werden', apiError);
         throw apiError;
       }
     },
-    [user],
+    [state.activities, state.logs, user],
   );
 
   const updateLog = useCallback(
