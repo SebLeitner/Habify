@@ -176,7 +176,7 @@ const ActivityCard = ({
                   )}
                   {dailyTarget.target.day > 0 && (
                     <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Tag: {dailyTarget.remaining.day}/{dailyTarget.target.day}
+                      Mittags/Nachmittags: {dailyTarget.remaining.day}/{dailyTarget.target.day}
                     </span>
                   )}
                   {dailyTarget.target.evening > 0 && (
@@ -221,7 +221,7 @@ const ActivityCard = ({
                   required
                 >
                   <option value="morning">Morgens</option>
-                  <option value="day">Mittags</option>
+                  <option value="day">Mittags/Nachmittags</option>
                   <option value="evening">Abends</option>
                 </select>
               </label>

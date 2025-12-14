@@ -118,11 +118,11 @@ const ActivitiesPage = () => {
             <section className="space-y-4">
               <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
               <div className="space-y-5">
-                {[
-                  { key: 'morning', title: 'Morgens', activities: morningHabits },
-                  { key: 'day', title: 'Tag', activities: dayHabits },
-                  { key: 'evening', title: 'Abend', activities: eveningHabits },
-                ]
+              {[ 
+                { key: 'morning', title: 'Morgens', activities: morningHabits },
+                { key: 'day', title: 'Mittags/Nachmittags', activities: dayHabits },
+                { key: 'evening', title: 'Abend', activities: eveningHabits },
+              ]
                   .filter((section) => section.activities.length > 0)
                   .map((section) => (
                     <div key={section.key} className="space-y-2">

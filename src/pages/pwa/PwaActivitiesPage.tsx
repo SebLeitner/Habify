@@ -28,25 +28,18 @@ type DailyTargetInfo = {
 
 type ActivityLogFormProps = {
   activity: Activity;
-  onAddLog: (values: {
-    activityId: string;
-    timestamp: string;
-    timeSlot?: 'morning' | 'day' | 'evening';
-    note?: string;
-    attributes?: LogAttributeValue[];
-  }) => Promise<void>;
+  onContinue: (values: { timestamp: string; note?: string }) => void;
   onClose: () => void;
   logs: LogEntry[];
 };
 
-const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormProps) => {
+const ActivityLogForm = ({ activity, onContinue, onClose, logs }: ActivityLogFormProps) => {
   const firefox = isFirefox();
   const initialDate = currentLocalDate();
   const [date, setDate] = useState(initialDate);
   const [firefoxDateInput, setFirefoxDateInput] = useState(() =>
     firefox ? formatDateForDisplay(initialDate) : '',
   );
-  const [timeSlot, setTimeSlot] = useState<'morning' | 'day' | 'evening'>('morning');
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +49,11 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
     setIsSaving(true);
     try {
       if (!date) {
-        throw new Error('Bitte Datum und Tageszeit auswählen.');
+        throw new Error('Bitte Datum auswählen.');
       }
 
-      await onAddLog({
-        activityId: activity.id,
+      onContinue({
         timestamp: dateToISODate(date),
-        timeSlot,
         note: note.trim() ? note.trim() : undefined,
       });
       const resetDate = currentLocalDate();
@@ -70,10 +61,8 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
       if (firefox) {
         setFirefoxDateInput(formatDateForDisplay(resetDate));
       }
-      setTimeSlot('morning');
       setNote('');
       setError(null);
-      onClose();
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -108,19 +97,6 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
           }}
           required
         />
-        <label className="flex flex-col gap-2 text-sm text-slate-200">
-          <span className="font-medium text-slate-100">Tageszeit</span>
-          <select
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-secondary/40"
-            value={timeSlot}
-            onChange={(event) => setTimeSlot(event.target.value as 'morning' | 'day' | 'evening')}
-            required
-          >
-            <option value="morning">Morgens</option>
-            <option value="day">Mittags</option>
-            <option value="evening">Abends</option>
-          </select>
-        </label>
       </div>
       <WeeklyActivityOverview activityId={activity.id} logs={logs} />
       <TextArea
@@ -140,7 +116,7 @@ const ActivityLogForm = ({ activity, onAddLog, onClose, logs }: ActivityLogFormP
           Abbrechen
         </button>
         <Button type="submit" disabled={isSaving}>
-          {isSaving ? 'Speichern …' : 'Speichern'}
+          {isSaving ? 'Weiter …' : 'Weiter'}
         </Button>
       </div>
     </form>
@@ -173,6 +149,12 @@ const PwaActivitiesPage = () => {
   const { state, addLog, isLoading, error } = useData();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingLog, setPendingLog] = useState<{
+    activity: Activity;
+    timestamp: string;
+    note?: string;
+  } | null>(null);
+  const [isTimeSlotSaving, setIsTimeSlotSaving] = useState(false);
 
   const dismissalsForToday = useMemo(() => extractDismissalsForToday(state.logs), [state.logs]);
 
@@ -301,7 +283,13 @@ const PwaActivitiesPage = () => {
     });
   };
 
-  const handleAddLog = async (values: { activityId: string; timestamp: string; note?: string; attributes?: LogAttributeValue[] }) => {
+  const handleAddLog = async (values: {
+    activityId: string;
+    timestamp: string;
+    note?: string;
+    timeSlot?: 'morning' | 'day' | 'evening';
+    attributes?: LogAttributeValue[];
+  }) => {
     setActionError(null);
     try {
       await addLog(values);
@@ -309,6 +297,34 @@ const PwaActivitiesPage = () => {
       console.error('PWA: Log konnte nicht gespeichert werden', apiError);
       setActionError('Speichern nicht möglich – bitte stelle die Verbindung zum Backend sicher.');
       throw apiError;
+    }
+  };
+
+  const handleLogFormContinue = (values: { timestamp: string; note?: string }) => {
+    if (!selectedActivity) return;
+    setPendingLog({
+      activity: selectedActivity,
+      timestamp: values.timestamp,
+      note: values.note,
+    });
+    setSelectedActivity(null);
+  };
+
+  const handleLogWithTimeSlot = async (slot: 'morning' | 'day' | 'evening') => {
+    if (!pendingLog) return;
+    setIsTimeSlotSaving(true);
+    try {
+      await handleAddLog({
+        activityId: pendingLog.activity.id,
+        timestamp: pendingLog.timestamp,
+        note: pendingLog.note,
+        timeSlot: slot,
+      });
+      setPendingLog(null);
+    } catch (apiError) {
+      console.error('PWA: Log konnte nicht mit Tageszeit gespeichert werden', apiError);
+    } finally {
+      setIsTimeSlotSaving(false);
     }
   };
 
@@ -325,9 +341,9 @@ const PwaActivitiesPage = () => {
           {!!dailyHabits.length && (
             <section className="space-y-4">
               <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
-              {[
+              {[ 
                 { key: 'morning' as const, title: 'Morgens', activities: morningHabits },
-                { key: 'day' as const, title: 'Tag', activities: dayHabits },
+                { key: 'day' as const, title: 'Mittags/Nachmittags', activities: dayHabits },
                 { key: 'evening' as const, title: 'Abend', activities: eveningHabits },
               ]
                 .filter((section) => section.activities.length > 0)
@@ -381,7 +397,7 @@ const PwaActivitiesPage = () => {
                                         )}
                                         {dailyTarget.target.day > 0 && (
                                           <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Tag: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
+                                            Mittags/Nachmittags: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
                                           </span>
                                         )}
                                         {dailyTarget.target.evening > 0 && (
@@ -454,7 +470,7 @@ const PwaActivitiesPage = () => {
                               )}
                               {dailyTarget.target.day > 0 && (
                                 <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Tag: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
+                                  Mittags/Nachmittags: {dailyTarget.remainingAfterDismissals.day}/{dailyTarget.target.day}
                                 </span>
                               )}
                               {dailyTarget.target.evening > 0 && (
@@ -499,10 +515,69 @@ const PwaActivitiesPage = () => {
                 </div>
                 <ActivityLogForm
                   activity={selectedActivity}
-                  onAddLog={handleAddLog}
+                  onContinue={handleLogFormContinue}
                   onClose={() => setSelectedActivity(null)}
                   logs={state.logs}
                 />
+              </div>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root
+        open={!!pendingLog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingLog(null);
+            setIsTimeSlotSaving(false);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl focus:outline-none">
+            {pendingLog && (
+              <div className="space-y-6">
+                <div className="flex items-start gap-3">
+                  <span
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                    style={{ backgroundColor: `${pendingLog.activity.color}33` }}
+                  >
+                    {pendingLog.activity.icon}
+                  </span>
+                  <div className="space-y-1">
+                    <Dialog.Title className="text-lg font-semibold text-white">{pendingLog.activity.name}</Dialog.Title>
+                    <Dialog.Description className="text-sm text-slate-400">
+                      Wähle die Tageszeit, um den Eintrag zu speichern.
+                    </Dialog.Description>
+                  </div>
+                  <Dialog.Close asChild>
+                    <button className="ml-auto rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white">
+                      ✕
+                    </button>
+                  </Dialog.Close>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { key: 'morning', label: 'Morgens' },
+                    { key: 'day', label: 'Mittags / Nachmittags' },
+                    { key: 'evening', label: 'Abends' },
+                  ].map((slot) => (
+                    <Button
+                      key={slot.key}
+                      type="button"
+                      className="w-full justify-center"
+                      disabled={isTimeSlotSaving}
+                      onClick={() => handleLogWithTimeSlot(slot.key as 'morning' | 'day' | 'evening')}
+                    >
+                      {slot.label}
+                    </Button>
+                  ))}
+                </div>
+                {isTimeSlotSaving && (
+                  <p className="text-center text-sm text-slate-400">Speichere Eintrag …</p>
+                )}
               </div>
             )}
           </Dialog.Content>
