@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Activity, LogEntry } from '../../contexts/DataContext';
 import { formatAttributeValue, formatLogTimestamp } from '../../utils/logFormatting';
+import { isMindfulnessLog } from '../../utils/logs';
 import LogDetailsDialog from './LogDetailsDialog';
 import Button from '../UI/Button';
 
@@ -33,11 +34,11 @@ const LogList = ({
     <div className="space-y-3">
       {logs.map((log) => {
         const activity = activityById.get(log.activityId);
-        const isMindfulnessLog = Boolean(log.mindfulnessId);
-        const accentColor = `${activity?.color ?? (isMindfulnessLog ? '#8b5cf6' : '#475569')}33`;
-        const title = isMindfulnessLog ? 'Achtsamkeit des Tages' : activity?.name ?? 'Unbekannte Aktivität';
-        const description = isMindfulnessLog ? log.mindfulnessTitle : undefined;
-        const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📌';
+        const mindfulnessLog = isMindfulnessLog(log);
+        const accentColor = `${activity?.color ?? (mindfulnessLog ? '#8b5cf6' : '#475569')}33`;
+        const title = mindfulnessLog ? 'Achtsamkeit des Tages' : activity?.name ?? 'Unbekannte Aktivität';
+        const description = mindfulnessLog ? log.mindfulnessTitle : undefined;
+        const icon = mindfulnessLog ? '🧘' : activity?.icon ?? '📌';
         return (
           <div
             key={log.id}
@@ -62,10 +63,10 @@ const LogList = ({
                 {description && (
                   <p className="mt-2 text-sm text-purple-100">{description}</p>
                 )}
-                {log.note && !isMindfulnessLog && (
+                {log.note && !mindfulnessLog && (
                   <p className="mt-2 text-sm text-slate-300">{log.note}</p>
                 )}
-                {!!log.attributes?.length && !isMindfulnessLog && (
+                {!!log.attributes?.length && !mindfulnessLog && (
                   <div className="mt-3 space-y-1 text-xs text-slate-300">
                     {log.attributes.map((attributeValue) => {
                       const activityAttribute = activity?.attributes.find(
@@ -90,7 +91,7 @@ const LogList = ({
             </div>
             {(onEdit || onDelete) && (
               <div className="flex gap-2">
-                {onEdit && !isMindfulnessLog && (
+                {onEdit && !mindfulnessLog && (
                   <Button
                     type="button"
                     variant="ghost"

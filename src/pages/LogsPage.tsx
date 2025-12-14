@@ -22,7 +22,7 @@ import { type DailyHighlight, LogEntry, useData } from '../contexts/DataContext'
 import { formatDateForDisplay, parseDisplayDateToISO } from '../utils/datetime';
 import { isFirefox } from '../utils/browser';
 import { buildPdfPages, downloadPdf, wrapText } from '../utils/pdf';
-import { isDismissalLog } from '../utils/logs';
+import { isDismissalLog, isMindfulnessLog } from '../utils/logs';
 
 const LogsPage = () => {
   const { state, deleteLog, deleteHighlight, isLoading, error, updateLog } = useData();
@@ -51,7 +51,7 @@ const LogsPage = () => {
   const resolveLogTitle = useMemo(
     () =>
       (log: LogEntry) =>
-        log.mindfulnessId ? 'Achtsamkeit des Tages' : activityLookup.get(log.activityId)?.name ?? 'Aktivität',
+        isMindfulnessLog(log) ? 'Achtsamkeit des Tages' : activityLookup.get(log.activityId)?.name ?? 'Aktivität',
     [activityLookup],
   );
 

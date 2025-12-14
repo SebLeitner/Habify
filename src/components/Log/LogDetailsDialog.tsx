@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Activity, LogEntry } from '../../contexts/DataContext';
 import { formatAttributeValue, formatLogTimestamp } from '../../utils/logFormatting';
+import { isMindfulnessLog } from '../../utils/logs';
 import WeeklyActivityOverview from './WeeklyActivityOverview';
 
 type LogDetailsDialogProps = {
@@ -12,10 +13,10 @@ type LogDetailsDialogProps = {
 };
 
 const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetailsDialogProps) => {
-  const isMindfulnessLog = Boolean(log.mindfulnessId);
-  const accentColor = `${activity?.color ?? (isMindfulnessLog ? '#8b5cf6' : '#475569')}33`;
-  const title = log.mindfulnessId ? 'Achtsamkeit des Tages' : activity?.name ?? 'Aktivität';
-  const icon = isMindfulnessLog ? '🧘' : activity?.icon ?? '📌';
+  const mindfulnessLog = isMindfulnessLog(log);
+  const accentColor = `${activity?.color ?? (mindfulnessLog ? '#8b5cf6' : '#475569')}33`;
+  const title = mindfulnessLog ? 'Achtsamkeit des Tages' : activity?.name ?? 'Aktivität';
+  const icon = mindfulnessLog ? '🧘' : activity?.icon ?? '📌';
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -42,7 +43,7 @@ const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetail
           </header>
 
           <div className="space-y-6 px-6 py-5">
-            {isMindfulnessLog && log.mindfulnessTitle && (
+            {mindfulnessLog && log.mindfulnessTitle && (
               <section className="space-y-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
                   Impuls
@@ -58,14 +59,14 @@ const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetail
                 className="border border-slate-800 bg-slate-900/60"
               />
             )}
-            {log.note && !isMindfulnessLog && (
+            {log.note && !mindfulnessLog && (
               <section className="space-y-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Notiz</h3>
                 <p className="text-base text-slate-100">{log.note}</p>
               </section>
             )}
 
-            {!!log.attributes?.length && !isMindfulnessLog && (
+            {!!log.attributes?.length && !mindfulnessLog && (
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Attribute</h3>
                 <div className="space-y-2">
