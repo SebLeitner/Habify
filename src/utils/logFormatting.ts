@@ -22,6 +22,11 @@ export const formatLogTimestamp = (log: Pick<LogEntry, 'timestamp' | 'timeSlot'>
   return `${date.toLocaleDateString('de-DE')} • ${resolveTimeSlotLabel(log)}`;
 };
 
+export const formatLogTime = (log: Pick<LogEntry, 'timestamp'>) => {
+  const date = new Date(log.timestamp);
+  return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+};
+
 export const formatAttributeValue = (
   attribute: ActivityAttribute | undefined,
   value: LogAttributeValue,

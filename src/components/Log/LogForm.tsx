@@ -6,10 +6,13 @@ import Input from '../UI/Input';
 import TextArea from '../UI/TextArea';
 import {
   currentLocalDate,
-  dateToISODate,
+  currentLocalTime,
+  combineDateAndTimeToISO,
   formatDateForDisplay,
   parseDisplayDateToISO,
+  parseDisplayTimeToISO,
   toLocalDateInput,
+  toLocalTimeInput,
 } from '../../utils/datetime';
 import AttributeValuesForm from './AttributeValuesForm';
 import WeeklyActivityOverview from './WeeklyActivityOverview';
@@ -38,11 +41,14 @@ const LogForm = ({
   const firefox = isFirefox();
   const defaultActivityId = activities[0]?.id ?? '';
   const initialDate = initialLog ? toLocalDateInput(initialLog.timestamp) : currentLocalDate();
+  const initialTime = initialLog ? toLocalTimeInput(initialLog.timestamp) : currentLocalTime();
   const [activityId, setActivityId] = useState(initialLog?.activityId ?? defaultActivityId);
   const [date, setDate] = useState(initialDate);
+  const [time, setTime] = useState(initialTime);
   const [firefoxDateInput, setFirefoxDateInput] = useState(() =>
     firefox ? formatDateForDisplay(initialDate) : '',
   );
+  const [firefoxTimeInput, setFirefoxTimeInput] = useState(() => (firefox ? initialTime : ''));
   const [timeSlot, setTimeSlot] = useState<'morning' | 'day' | 'evening'>(initialLog?.timeSlot ?? 'morning');
   const [note, setNote] = useState(initialLog?.note ?? '');
   const [isTimeSlotDialogOpen, setIsTimeSlotDialogOpen] = useState(false);
@@ -69,8 +75,10 @@ const LogForm = ({
   useEffect(() => {
     const nextDate = initialLog ? toLocalDateInput(initialLog.timestamp) : currentLocalDate();
     setDate(nextDate);
+    setTime(initialLog ? toLocalTimeInput(initialLog.timestamp) : currentLocalTime());
     if (firefox) {
       setFirefoxDateInput(formatDateForDisplay(nextDate));
+      setFirefoxTimeInput(initialLog ? toLocalTimeInput(initialLog.timestamp) : currentLocalTime());
     }
     setTimeSlot(initialLog?.timeSlot ?? 'morning');
   }, [firefox, initialLog]);
@@ -80,9 +88,9 @@ const LogForm = ({
   }
 
   const handleSubmit = async (slot: 'morning' | 'day' | 'evening') => {
-    if (!activityId || !date) return;
+    if (!activityId || !date || !time) return;
     setTimeSlot(slot);
-    const isoTimestamp = dateToISODate(date);
+    const isoTimestamp = combineDateAndTimeToISO(date, time);
     const attributeValues = serializeDrafts(drafts);
     setIsSubmitting(true);
     try {
@@ -98,8 +106,10 @@ const LogForm = ({
         setActivityId(activities[0]?.id ?? '');
         const resetDate = currentLocalDate();
         setDate(resetDate);
+        setTime(currentLocalTime());
         if (firefox) {
           setFirefoxDateInput(formatDateForDisplay(resetDate));
+          setFirefoxTimeInput(currentLocalTime());
         }
         setTimeSlot('morning');
         setNote('');
@@ -132,6 +142,19 @@ const LogForm = ({
     setDate(value);
   };
 
+  const handleTimeChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.target;
+
+    if (firefox) {
+      setFirefoxTimeInput(value);
+      const parsed = parseDisplayTimeToISO(value);
+      setTime(parsed);
+      return;
+    }
+
+    setTime(value);
+  };
+
   return (
     <form className="space-y-4" onSubmit={handleFormSubmit}>
       <label className="flex flex-col gap-2 text-sm text-slate-200">
@@ -158,6 +181,17 @@ const LogForm = ({
         pattern={firefox ? '\\d{2}\\.\\d{2}\\.\\d{4}' : undefined}
         value={firefox ? firefoxDateInput : date}
         onChange={handleDateChange}
+        required
+      />
+      <Input
+        label="Uhrzeit"
+        type={firefox ? 'text' : 'time'}
+        inputMode={firefox ? 'numeric' : undefined}
+        placeholder={firefox ? 'HH:MM' : undefined}
+        pattern={firefox ? '\\d{2}:\\d{2}' : undefined}
+        step={60}
+        value={firefox ? firefoxTimeInput : time}
+        onChange={handleTimeChange}
         required
       />
       {isEditing && (
