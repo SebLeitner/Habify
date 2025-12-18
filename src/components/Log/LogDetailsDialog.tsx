@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Activity, LogEntry } from '../../contexts/DataContext';
-import { formatAttributeValue, formatLogTimestamp } from '../../utils/logFormatting';
+import { formatAttributeValue, formatLogTime, formatLogTimestamp } from '../../utils/logFormatting';
 import { isMindfulnessLog } from '../../utils/logs';
 import WeeklyActivityOverview from './WeeklyActivityOverview';
 
@@ -33,6 +33,7 @@ const LogDetailsDialog = ({ log, activity, logs, open, onOpenChange }: LogDetail
                 <Dialog.Description className="text-sm text-slate-400">
                   {formatLogTimestamp(log)}
                 </Dialog.Description>
+                <p className="text-xs text-slate-300">Uhrzeit: {formatLogTime(log)}</p>
               </div>
             </div>
             <Dialog.Close asChild>
