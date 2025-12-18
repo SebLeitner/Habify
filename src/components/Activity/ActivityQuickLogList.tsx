@@ -10,6 +10,7 @@ import type { LogAttributeValue } from '../../types';
 import { isFirefox } from '../../utils/browser';
 import WeeklyActivityOverview from '../Log/WeeklyActivityOverview';
 import type { DailyHabitTargets } from '../../types';
+import { formatTimeSlotBadgeValues } from '../../utils/dailyHabitTargets';
 
 type ActivityQuickLogListProps = {
   activities: Activity[];
@@ -31,8 +32,6 @@ type DailyTargetInfo = {
   totalTarget: number;
   totalRemaining: number;
 };
-
-const getCompletedCount = (target: number, remaining: number): number => Math.max(target - remaining, 0);
 
 const ActivityCard = ({
   activity,
@@ -75,6 +74,9 @@ const ActivityCard = ({
   }, [activity.id, activity.attributes, attributeSignature]);
 
   const accentColor = `${activity.color}33`;
+  const timeSlotBadgeValues = dailyTarget
+    ? formatTimeSlotBadgeValues(dailyTarget.target, dailyTarget.remaining)
+    : null;
 
   const toggle = () => {
     setIsExpanded((previous) => {
@@ -168,27 +170,15 @@ const ActivityCard = ({
               {activity.active ? 'Aktiv' : 'Inaktiv'} • Aktualisiert am{' '}
               {new Date(activity.updatedAt).toLocaleDateString('de-DE')}
             </p>
-            {dailyTarget && (
+            {dailyTarget && timeSlotBadgeValues && (
               <div className="space-y-1 text-[11px] font-semibold">
                 <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
-                  {dailyTarget.target.morning > 0 && (
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Morgens: {getCompletedCount(dailyTarget.target.morning, dailyTarget.remaining.morning)}/
-                      {dailyTarget.target.morning}
-                    </span>
-                  )}
-                  {dailyTarget.target.day > 0 && (
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Mittags/Nachmittags: {getCompletedCount(dailyTarget.target.day, dailyTarget.remaining.day)}/
-                      {dailyTarget.target.day}
-                    </span>
-                  )}
-                  {dailyTarget.target.evening > 0 && (
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                      Abend: {getCompletedCount(dailyTarget.target.evening, dailyTarget.remaining.evening)}/
-                      {dailyTarget.target.evening}
-                    </span>
-                  )}
+                  <span
+                    className="rounded-full bg-slate-800 px-2 py-0.5"
+                    aria-label={`Morgens: ${timeSlotBadgeValues[0]}, Mittags/Nachmittags: ${timeSlotBadgeValues[1]}, Abends: ${timeSlotBadgeValues[2]}`}
+                  >
+                    {timeSlotBadgeValues.join(' ')}
+                  </span>
                 </div>
               </div>
             )}

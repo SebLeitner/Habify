@@ -76,5 +76,20 @@ export const calculateRemainingTargets = (
   return remainingTargets;
 };
 
+export const formatTimeSlotBadgeValues = (
+  targets: DailyHabitTargets,
+  remaining: DailyHabitTargets,
+): [string, string, string] => {
+  return (['morning', 'day', 'evening'] as const).map((slot) => {
+    const targetValue = targets[slot];
+    if (targetValue <= 0) return 'X';
+
+    const remainingValue = remaining[slot];
+    if (remainingValue <= 0) return '0';
+
+    return String(remainingValue);
+  }) as [string, string, string];
+};
+
 export const hasAnyDailyTarget = (targets: DailyHabitTargets): boolean =>
   sumDailyHabitTargets(targets) > 0;

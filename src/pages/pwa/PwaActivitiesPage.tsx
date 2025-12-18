@@ -12,6 +12,7 @@ import { isFirefox } from '../../utils/browser';
 import {
   calculateRemainingTargets,
   defaultDailyHabitTargets,
+  formatTimeSlotBadgeValues,
   normalizeDailyHabitTargets,
   sumDailyHabitTargets,
 } from '../../utils/dailyHabitTargets';
@@ -35,8 +36,6 @@ type ActivityLogFormProps = {
   onClose: () => void;
   logs: LogEntry[];
 };
-
-const getCompletedCount = (target: number, remaining: number): number => Math.max(target - remaining, 0);
 
 const getRecencyBadgeLabel = (lastLog: Date | null): string => {
   if (!lastLog) return 'X';
@@ -448,7 +447,7 @@ const PwaActivitiesPage = () => {
           {!!dailyHabits.length && (
             <section className="space-y-4">
               <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
-              {[ 
+              {[
                 { key: 'morning' as const, title: 'Morgens', activities: morningHabits },
                 { key: 'day' as const, title: 'Mittags/Nachmittags', activities: dayHabits },
                 { key: 'evening' as const, title: 'Abend', activities: eveningHabits },
@@ -465,6 +464,9 @@ const PwaActivitiesPage = () => {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {section.activities.map((activity) => {
                         const dailyTarget = dailyTargets.get(activity.id);
+                        const timeSlotBadgeValues = dailyTarget
+                          ? formatTimeSlotBadgeValues(dailyTarget.target, dailyTarget.remainingAfterDismissals)
+                          : null;
                         return (
                           <div
                             key={activity.id}
@@ -494,39 +496,15 @@ const PwaActivitiesPage = () => {
                                       7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
                                     </span>
                                   </div>
-                                  {dailyTarget && (
+                                  {dailyTarget && timeSlotBadgeValues && (
                                     <div className="space-y-1 text-[11px] font-semibold">
                                       <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
-                                        {dailyTarget.target.morning > 0 && (
-                                          <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Morgens:{' '}
-                                            {getCompletedCount(
-                                              dailyTarget.target.morning,
-                                              dailyTarget.remainingAfterDismissals.morning,
-                                            )}
-                                            /{dailyTarget.target.morning}
-                                          </span>
-                                        )}
-                                        {dailyTarget.target.day > 0 && (
-                                          <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Mittags/Nachmittags:{' '}
-                                            {getCompletedCount(
-                                              dailyTarget.target.day,
-                                              dailyTarget.remainingAfterDismissals.day,
-                                            )}
-                                            /{dailyTarget.target.day}
-                                          </span>
-                                        )}
-                                        {dailyTarget.target.evening > 0 && (
-                                          <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                            Abend:{' '}
-                                            {getCompletedCount(
-                                              dailyTarget.target.evening,
-                                              dailyTarget.remainingAfterDismissals.evening,
-                                            )}
-                                            /{dailyTarget.target.evening}
-                                          </span>
-                                        )}
+                                        <span
+                                          className="rounded-full bg-slate-800 px-2 py-0.5"
+                                          aria-label={`Morgens: ${timeSlotBadgeValues[0]}, Mittags/Nachmittags: ${timeSlotBadgeValues[1]}, Abends: ${timeSlotBadgeValues[2]}`}
+                                        >
+                                          {timeSlotBadgeValues.join(' ')}
+                                        </span>
                                       </div>
                                     </div>
                                   )}
@@ -562,6 +540,9 @@ const PwaActivitiesPage = () => {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {regularActivities.map((activity) => {
                 const dailyTarget = dailyTargets.get(activity.id);
+                const timeSlotBadgeValues = dailyTarget
+                  ? formatTimeSlotBadgeValues(dailyTarget.target, dailyTarget.remainingAfterDismissals)
+                  : null;
                 return (
                   <div key={activity.id} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
                     <button
@@ -587,39 +568,15 @@ const PwaActivitiesPage = () => {
                             7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
                           </span>
                         </div>
-                        {dailyTarget && (
+                        {dailyTarget && timeSlotBadgeValues && (
                           <div className="space-y-1 text-[11px] font-semibold">
                             <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
-                              {dailyTarget.target.morning > 0 && (
-                                <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Morgens:{' '}
-                                  {getCompletedCount(
-                                    dailyTarget.target.morning,
-                                    dailyTarget.remainingAfterDismissals.morning,
-                                  )}
-                                  /{dailyTarget.target.morning}
-                                </span>
-                              )}
-                              {dailyTarget.target.day > 0 && (
-                                <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Mittags/Nachmittags:{' '}
-                                  {getCompletedCount(
-                                    dailyTarget.target.day,
-                                    dailyTarget.remainingAfterDismissals.day,
-                                  )}
-                                  /{dailyTarget.target.day}
-                                </span>
-                              )}
-                              {dailyTarget.target.evening > 0 && (
-                                <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                  Abend:{' '}
-                                  {getCompletedCount(
-                                    dailyTarget.target.evening,
-                                    dailyTarget.remainingAfterDismissals.evening,
-                                  )}
-                                  /{dailyTarget.target.evening}
-                                </span>
-                              )}
+                              <span
+                                className="rounded-full bg-slate-800 px-2 py-0.5"
+                                aria-label={`Morgens: ${timeSlotBadgeValues[0]}, Mittags/Nachmittags: ${timeSlotBadgeValues[1]}, Abends: ${timeSlotBadgeValues[2]}`}
+                              >
+                                {timeSlotBadgeValues.join(' ')}
+                              </span>
                             </div>
                           </div>
                         )}
