@@ -12,6 +12,7 @@ import {
 } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
 import { buildMixedPdfPages, createCoverPage, downloadPdf, PdfImage, PdfLayoutBlock, wrapText } from '../../utils/pdf';
+import { compressImageFile } from '../../utils/image';
 
 const PwaHighlightsPage = () => {
   const { state, addHighlight, updateHighlight, deleteHighlight, isLoading, error } = useData();
@@ -353,7 +354,7 @@ const PwaHighlightsPage = () => {
     setModalDate(selectedDate);
   };
 
-  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     setPhotoError(null);
     const file = event.target.files?.[0];
 
@@ -376,13 +377,20 @@ const PwaHighlightsPage = () => {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setPendingPhoto({ dataUrl: reader.result as string, name: file.name });
+    try {
+      const compressed = await compressImageFile(file);
+      setPendingPhoto(compressed);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (processingError) {
+      console.error('PWA: Foto konnte nicht verarbeitet werden', processingError);
+      setPhotoError('Foto konnte nicht verarbeitet werden. Bitte versuche es erneut.');
+      setPendingPhoto(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleUploadSelectedPhoto = () => {
@@ -505,7 +513,7 @@ const PwaHighlightsPage = () => {
                                 </div>
                                 <div className="space-y-1">
                                   <p className="font-semibold text-slate-200">{pendingPhoto.name}</p>
-                                  <p className="text-slate-400">Ausgewählt – zum Hinzufügen auf „Foto hochladen" tippen.</p>
+                                  <p className="text-slate-400">Ausgewählt – zum Hinzufügen auf „Foto hochladen“ tippen.</p>
                                 </div>
                               </div>
                             ) : (

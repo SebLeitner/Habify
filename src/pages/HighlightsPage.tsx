@@ -9,6 +9,7 @@ import Spinner from '../components/UI/Spinner';
 import { DailyHighlight, useData } from '../contexts/DataContext';
 import { formatDateForDisplay, parseDisplayDateToISO } from '../utils/datetime';
 import { isFirefox } from '../utils/browser';
+import { compressImageFile } from '../utils/image';
 
 const todayAsString = () => format(new Date(), 'yyyy-MM-dd');
 
@@ -124,7 +125,7 @@ const HighlightsPage = () => {
     }
   };
 
-  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     setPhotoError(null);
     const files = Array.from(event.target.files ?? []);
 
@@ -147,19 +148,23 @@ const HighlightsPage = () => {
       return;
     }
 
-    filesToProcess.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setPhotoPreviews((prev) => [...prev, reader.result as string]);
-          setPhotoNames((prev) => [...prev, file.name]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const compressedFiles = await Promise.all(filesToProcess.map((file) => compressImageFile(file)));
+      setPhotoPreviews((prev) => [...prev, ...compressedFiles.map((file) => file.dataUrl)]);
+      setPhotoNames((prev) => [...prev, ...compressedFiles.map((file) => file.name)]);
+    } catch (processingError) {
+      console.error('Foto konnte nicht verarbeitet werden', processingError);
+      setPhotoError('Fotos konnten nicht verarbeitet werden. Bitte versuche es erneut.');
+      event.target.value = '';
+      return;
+    }
 
     if (files.length > filesToProcess.length) {
       setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
