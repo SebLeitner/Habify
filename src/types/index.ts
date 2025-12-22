@@ -66,6 +66,7 @@ export type DailyHighlight = {
   date: string;
   title: string;
   text: string;
+  photos?: string[];
   photoUrl?: string | null;
   userId: string;
   createdAt: string;

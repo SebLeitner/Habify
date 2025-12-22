@@ -174,16 +174,30 @@ const normalizeLog = (log: LogEntry): LogEntry => ({
   attributes: normalizeLogAttributes((log as LogEntry).attributes),
 });
 
-const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => ({
-  ...highlight,
-  date: highlight.date,
-  title: (highlight.title ?? '').toString(),
-  text: (highlight.text ?? '').toString(),
-  photoUrl:
-    highlight.photoUrl === null || highlight.photoUrl === undefined
-      ? null
-      : highlight.photoUrl.toString(),
-});
+const normalizeHighlight = (highlight: DailyHighlight): DailyHighlight => {
+  const photosSource = Array.isArray((highlight as DailyHighlight & { photos?: unknown }).photos)
+    ? ((highlight as DailyHighlight & { photos?: unknown }).photos as unknown[])
+    : [];
+  const legacyPhotoUrl = (highlight as DailyHighlight & { photoUrl?: unknown }).photoUrl;
+  const mergedPhotos = photosSource.length
+    ? photosSource
+    : legacyPhotoUrl
+      ? [legacyPhotoUrl]
+      : [];
+
+  const photos = mergedPhotos
+    .map((photo) => photo?.toString().trim())
+    .filter((value): value is string => Boolean(value));
+
+  return {
+    ...highlight,
+    date: highlight.date,
+    title: (highlight.title ?? '').toString(),
+    text: (highlight.text ?? '').toString(),
+    photos,
+    photoUrl: photos[0] ?? null,
+  };
+};
 
 const normalizeMindfulnessActivity = (entry: MindfulnessActivity): MindfulnessActivity => {
   const rest = { ...entry } as MindfulnessActivity & { date?: string };
