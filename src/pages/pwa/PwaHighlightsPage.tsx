@@ -3,7 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
 import TextArea from '../../components/UI/TextArea';
-import { useData } from '../../contexts/DataContext';
+import { DailyHighlight, useData } from '../../contexts/DataContext';
 import {
   currentLocalDate,
   formatDateForDisplay,
@@ -11,7 +11,7 @@ import {
   toLocalDateInput,
 } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
-import { buildPdfPages, createCoverPage, downloadPdf, wrapText } from '../../utils/pdf';
+import { buildMixedPdfPages, createCoverPage, downloadPdf, PdfImage, PdfLayoutBlock, wrapText } from '../../utils/pdf';
 
 const PwaHighlightsPage = () => {
   const { state, addHighlight, updateHighlight, deleteHighlight, isLoading, error } = useData();
@@ -23,8 +23,8 @@ const PwaHighlightsPage = () => {
   const [firefoxDateInput, setFirefoxDateInput] = useState(() => (firefox ? formatDateForDisplay(initialDate) : ''));
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoName, setPhotoName] = useState<string | null>(null);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [photoNames, setPhotoNames] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,8 +32,12 @@ const PwaHighlightsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [highlightError, setHighlightError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const PDF_MAX_IMAGE_WIDTH = (15 / 2.54) * 72; // 15 cm in PDF points
+  const PDF_MAX_IMAGE_HEIGHT = (8 / 2.54) * 72; // 8 cm in PDF points
 
   const highlights = useMemo(
     () =>
@@ -107,8 +111,8 @@ const PwaHighlightsPage = () => {
     setFormError(null);
     setHighlightError(null);
     setEditingHighlightId(null);
-    setPhotoPreview(null);
-    setPhotoName(null);
+    setPhotoPreviews([]);
+    setPhotoNames([]);
     setPhotoError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -119,6 +123,7 @@ const PwaHighlightsPage = () => {
     event.preventDefault();
     const trimmedTitle = title.trim();
     const trimmedText = text.trim();
+    const photos = photoPreviews.slice(0, 3);
 
     if (!trimmedTitle || !trimmedText || !date) {
       setFormError('Alle Felder ausfüllen – Speichern nur mit aktiver Backend-Verbindung.');
@@ -133,16 +138,17 @@ const PwaHighlightsPage = () => {
           title: trimmedTitle,
           text: trimmedText,
           date,
-          photoUrl: photoPreview ?? null,
+          photos,
+          photoUrl: photos[0] ?? null,
         });
         setEditingHighlightId(null);
       } else {
-        await addHighlight({ title: trimmedTitle, text: trimmedText, date, photoUrl: photoPreview ?? null });
+        await addHighlight({ title: trimmedTitle, text: trimmedText, date, photos, photoUrl: photos[0] ?? null });
       }
       setTitle('');
       setText('');
-      setPhotoPreview(null);
-      setPhotoName(null);
+      setPhotoPreviews([]);
+      setPhotoNames([]);
       setIsModalOpen(false);
       setSelectedDate(date);
       if (fileInputRef.current) {
@@ -168,8 +174,9 @@ const PwaHighlightsPage = () => {
     setTitle(highlight.title ?? '');
     setText(highlight.text ?? '');
     setModalDate(highlight.date);
-    setPhotoPreview(highlight.photoUrl ?? null);
-    setPhotoName(highlight.photoUrl ? 'Gespeichertes Foto' : null);
+    const photos = resolveHighlightPhotos(highlight);
+    setPhotoPreviews(photos);
+    setPhotoNames(photos.map(() => 'Gespeichertes Foto'));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -215,34 +222,86 @@ const PwaHighlightsPage = () => {
     }
   }, [isModalOpen, editingHighlightId]);
 
-  const buildPdfLines = () => {
+  const resolveHighlightPhotos = (highlight: DailyHighlight): string[] =>
+    highlight.photos?.length ? highlight.photos : highlight.photoUrl ? [highlight.photoUrl] : [];
+
+  const prepareImageForPdf = async (source: string): Promise<PdfImage | null> => {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.onload = async () => {
+        if (!image.naturalWidth || !image.naturalHeight) {
+          reject(new Error('Ungültige Bildabmessungen.'));
+          return;
+        }
+        const scale = Math.min(PDF_MAX_IMAGE_WIDTH / image.naturalWidth, PDF_MAX_IMAGE_HEIGHT / image.naturalHeight, 1);
+        const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
+        const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const context = canvas.getContext('2d');
+        if (!context) {
+          reject(new Error('Bild konnte nicht gerendert werden.'));
+          return;
+        }
+        context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            reject(new Error('Bild konnte nicht verarbeitet werden.'));
+            return;
+          }
+          const buffer = await blob.arrayBuffer();
+          resolve({ data: new Uint8Array(buffer), width: targetWidth, height: targetHeight });
+        }, 'image/jpeg', 0.9);
+      };
+      image.onerror = () => reject(new Error('Bild konnte nicht geladen werden.'));
+      image.src = source;
+    });
+  };
+
+  const buildPdfBlocks = async (): Promise<PdfLayoutBlock[]> => {
     if (!highlightsByDayAscending.length) {
-      return ['Keine Highlights vorhanden.'];
+      return [{ type: 'text', text: 'Keine Highlights vorhanden.', marginBottom: 10 }];
     }
 
-    const lines: string[] = [];
+    const blocks: PdfLayoutBlock[] = [];
 
-    highlightsByDayAscending.forEach(({ isoDate, entries }) => {
+    for (const { isoDate, entries } of highlightsByDayAscending) {
       const heading = new Date(isoDate).toLocaleDateString('de-DE', {
         weekday: 'long',
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
       });
-      lines.push(heading);
 
-      entries.forEach((entry) => {
+      blocks.push({ type: 'text', text: heading, fontSize: 14, marginBottom: 8 });
+
+      for (const entry of entries) {
         const content = [entry.title, entry.text].filter(Boolean).join(': ').trim() || 'Highlight ohne Inhalt';
-        const wrapped = wrapText(content, 100);
+        const wrapped = wrapText(content, 90);
         wrapped.forEach((line, index) => {
-          lines.push(index === 0 ? `- ${line}` : `  ${line}`);
+          blocks.push({ type: 'text', text: `${index === 0 ? '- ' : '  '}${line}`, marginBottom: 2 });
         });
-      });
 
-      lines.push('');
-    });
+        const photos = resolveHighlightPhotos(entry).slice(0, 3);
+        for (const photo of photos) {
+          try {
+            const image = await prepareImageForPdf(photo);
+            if (image) {
+              blocks.push({ type: 'image', image, marginBottom: 10 });
+            }
+          } catch (pdfImageError) {
+            console.error('Foto konnte nicht für den Export vorbereitet werden', pdfImageError);
+          }
+        }
 
-    return lines;
+        blocks.push({ type: 'text', text: '', marginBottom: 8 });
+      }
+    }
+
+    return blocks;
   };
 
   const buildCoverPage = () => {
@@ -264,11 +323,12 @@ const PwaHighlightsPage = () => {
     });
   };
 
-  const exportHighlights = () => {
+  const exportHighlights = async () => {
     try {
       setExportError(null);
-      const lines = buildPdfLines();
-      const pages = buildPdfPages(lines.length ? lines : ['Keine Highlights vorhanden.']);
+      setIsExporting(true);
+      const blocks = await buildPdfBlocks();
+      const pages = buildMixedPdfPages(blocks.length ? blocks : [{ type: 'text', text: 'Keine Highlights vorhanden.' }]);
       const coverPage = buildCoverPage();
       const pdfPages = coverPage ? [coverPage, ...pages] : pages;
       const filename = `highlights-${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -279,6 +339,8 @@ const PwaHighlightsPage = () => {
           ? exportErr.message
           : 'PDF konnte nicht erstellt werden – bitte versuche es erneut.';
       setExportError(message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -290,32 +352,46 @@ const PwaHighlightsPage = () => {
 
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
     setPhotoError(null);
-    const file = event.target.files?.[0];
-    if (!file) {
-      setPhotoPreview(null);
-      setPhotoName(null);
+    const files = Array.from(event.target.files ?? []);
+
+    if (!files.length) {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      setPhotoError('Bitte wähle eine Bilddatei aus.');
+    const availableSlots = 3 - photoPreviews.length;
+    if (availableSlots <= 0) {
+      setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
       event.target.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setPhotoPreview(reader.result);
-        setPhotoName(file.name);
-      }
-    };
-    reader.readAsDataURL(file);
+    const filesToProcess = files.slice(0, availableSlots);
+    const invalidFile = filesToProcess.find((file) => !file.type.startsWith('image/'));
+    if (invalidFile) {
+      setPhotoError('Bitte wähle eine gültige Bilddatei aus.');
+      event.target.value = '';
+      return;
+    }
+
+    filesToProcess.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setPhotoPreviews((prev) => [...prev, reader.result as string]);
+          setPhotoNames((prev) => [...prev, file.name]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (files.length > filesToProcess.length) {
+      setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
+    }
   };
 
-  const removePhoto = () => {
-    setPhotoPreview(null);
-    setPhotoName(null);
+  const removePhoto = (index: number) => {
+    setPhotoPreviews((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    setPhotoNames((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
     setPhotoError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -330,8 +406,8 @@ const PwaHighlightsPage = () => {
           <h1 className="text-xl font-semibold text-white">Highlights</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" className="whitespace-nowrap" onClick={exportHighlights}>
-            PDF exportieren
+          <Button variant="ghost" className="whitespace-nowrap" onClick={exportHighlights} disabled={isExporting}>
+            {isExporting ? 'Exportiere …' : 'PDF exportieren'}
           </Button>
           <Dialog.Root open={isModalOpen} onOpenChange={handleOpenChange}>
             <Dialog.Trigger asChild>
@@ -388,33 +464,42 @@ const PwaHighlightsPage = () => {
                       <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
                         <label className="block text-sm font-medium text-slate-200">
                           Foto (optional)
-                          <p className="text-xs text-slate-400">Maximal ein Bild pro Highlight.</p>
+                          <p className="text-xs text-slate-400">Füge optional ein Foto hinzu. Maximal 3 Dateien.</p>
                           <input
                             ref={fileInputRef}
                             type="file"
                             accept="image/*"
+                            multiple
                             onChange={handlePhotoChange}
                             className="mt-1 block w-full text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-brand-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-brand-secondary/90"
                           />
                         </label>
-                        {photoName && (
-                          <p className="text-xs text-slate-300">Ausgewählt: {photoName}</p>
+                        {photoNames.length > 0 && (
+                          <ul className="text-xs text-slate-300">
+                            {photoNames.map((name, index) => (
+                              <li key={`${name}-${index}`}>{name}</li>
+                            ))}
+                          </ul>
                         )}
-                        {photoPreview && (
-                          <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
-                            <img
-                              src={photoPreview}
-                              alt={title ? `Foto zum Highlight ${title}` : 'Foto zum Highlight'}
-                              className="max-h-64 w-full object-cover"
-                            />
+                        {photoPreviews.length > 0 && (
+                          <div className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2 sm:grid-cols-2">
+                            {photoPreviews.map((photo, index) => (
+                              <div key={`${photo}-${index}`} className="space-y-2">
+                                <div className="overflow-hidden rounded-md bg-slate-950">
+                                  <img
+                                    src={photo}
+                                    alt={title ? `Foto zum Highlight ${title}` : 'Foto zum Highlight'}
+                                    className="max-h-56 w-full object-contain"
+                                  />
+                                </div>
+                                <Button type="button" variant="ghost" onClick={() => removePhoto(index)}>
+                                  Foto entfernen
+                                </Button>
+                              </div>
+                            ))}
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2">
-                          {photoPreview && (
-                            <Button type="button" variant="ghost" onClick={removePhoto}>
-                              Foto entfernen
-                            </Button>
-                          )}
                           {photoError && <p className="text-xs text-red-400">{photoError}</p>}
                         </div>
                       </div>
@@ -522,51 +607,58 @@ const PwaHighlightsPage = () => {
           <p className="text-sm text-slate-500">Für diesen Tag wurden noch keine Highlights erfasst.</p>
         ) : (
           <ul className="space-y-2">
-            {highlightsForSelectedDay.map((highlight) => (
-              <li key={highlight.id}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  className="flex w-full items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-3 text-left transition hover:-translate-y-[1px] hover:border-slate-700 hover:bg-slate-900"
-                  onClick={() => handleHighlightClick(highlight.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      handleHighlightClick(highlight.id);
-                    }
-                  }}
-                >
-                  <div className="flex-1">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      {new Date(highlight.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </p>
-                    <p className="text-sm font-semibold text-white">{highlight.title}</p>
-                    <p className="text-sm text-slate-300">{highlight.text}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        className="px-3 py-1 text-xs"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleHighlightClick(highlight.id);
-                        }}
-                      >
-                        Text bearbeiten
-                      </Button>
-                    </div>
-                    {highlight.photoUrl && (
-                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
-                        <img
-                          src={highlight.photoUrl}
-                          alt={highlight.title ? `Foto zu ${highlight.title}` : 'Highlight-Foto'}
-                          className="max-h-56 w-full object-cover"
-                        />
+            {highlightsForSelectedDay.map((highlight) => {
+              const photos = resolveHighlightPhotos(highlight);
+              return (
+                <li key={highlight.id}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="flex w-full items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-3 text-left transition hover:-translate-y-[1px] hover:border-slate-700 hover:bg-slate-900"
+                    onClick={() => handleHighlightClick(highlight.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleHighlightClick(highlight.id);
+                      }
+                    }}
+                  >
+                    <div className="flex-1">
+                      <p className="text-xs uppercase tracking-wide text-slate-400">
+                        {new Date(highlight.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </p>
+                      <p className="text-sm font-semibold text-white">{highlight.title}</p>
+                      <p className="text-sm text-slate-300">{highlight.text}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                          variant="secondary"
+                          className="px-3 py-1 text-xs"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleHighlightClick(highlight.id);
+                          }}
+                        >
+                          Text bearbeiten
+                        </Button>
                       </div>
-                    )}
+                      {photos.length > 0 && (
+                        <div className="mt-3 grid gap-3 rounded-lg border border-slate-800 bg-slate-950/40 p-2 sm:grid-cols-2">
+                          {photos.slice(0, 3).map((photo, index) => (
+                            <div key={`${highlight.id}-preview-${index}`} className="overflow-hidden rounded-md">
+                              <img
+                                src={photo}
+                                alt={highlight.title ? `Foto zu ${highlight.title}` : 'Highlight-Foto'}
+                                className="max-h-56 w-full object-contain"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

@@ -42,19 +42,32 @@ const DailyHighlights = ({
             const titleText = highlight.title?.trim() || highlight.text || 'Highlight';
             const description = highlight.text?.trim() ?? '';
             const showDescription = Boolean(description);
+            const photos = (highlight.photos && highlight.photos.length
+              ? highlight.photos
+              : highlight.photoUrl
+                ? [highlight.photoUrl]
+                : []) as string[];
+
             return (
               <div
                 key={highlight.id}
                 className="flex items-start justify-between gap-4 rounded-lg border border-slate-800 bg-slate-900/70 p-4"
               >
                 <div className="flex items-start gap-3">
-                  {highlight.photoUrl && (
-                    <div className="h-16 w-16 overflow-hidden rounded-lg border border-slate-800 bg-slate-950/50">
-                      <img
-                        src={highlight.photoUrl}
-                        alt={titleText ? `Foto zu ${titleText}` : 'Highlight-Foto'}
-                        className="h-full w-full object-cover"
-                      />
+                  {photos.length > 0 && (
+                    <div className="grid max-w-[220px] grid-cols-3 gap-2">
+                      {photos.slice(0, 3).map((photo, index) => (
+                        <div
+                          key={`${highlight.id}-photo-${index}`}
+                          className="h-16 w-16 overflow-hidden rounded-lg border border-slate-800 bg-slate-950/50"
+                        >
+                          <img
+                            src={photo}
+                            alt={titleText ? `Foto zu ${titleText}` : 'Highlight-Foto'}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                      ))}
                     </div>
                   )}
                   <div>

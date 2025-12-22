@@ -16,8 +16,8 @@ const HighlightsPage = () => {
   const { state, addHighlight, deleteHighlight, updateHighlight, isLoading, error } = useData();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoName, setPhotoName] = useState<string | null>(null);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [photoNames, setPhotoNames] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const firefox = isFirefox();
   const initialDate = todayAsString();
@@ -33,8 +33,8 @@ const HighlightsPage = () => {
   const resetForm = (nextDate = date) => {
     setTitle('');
     setText('');
-    setPhotoPreview(null);
-    setPhotoName(null);
+    setPhotoPreviews([]);
+    setPhotoNames([]);
     setPhotoError(null);
     setEditingHighlightId(null);
     setFormError(null);
@@ -81,6 +81,7 @@ const HighlightsPage = () => {
     event.preventDefault();
     const trimmedTitle = title.trim();
     const trimmedText = text.trim();
+    const photos = photoPreviews.slice(0, 3);
 
     if (!trimmedTitle) {
       setFormError('Bitte gib einen Titel für das Highlight ein.');
@@ -105,10 +106,11 @@ const HighlightsPage = () => {
           title: trimmedTitle,
           text: trimmedText,
           date,
-          photoUrl: photoPreview ?? null,
+          photos,
+          photoUrl: photos[0] ?? null,
         });
       } else {
-        await addHighlight({ title: trimmedTitle, text: trimmedText, date, photoUrl: photoPreview ?? null });
+        await addHighlight({ title: trimmedTitle, text: trimmedText, date, photos, photoUrl: photos[0] ?? null });
       }
       resetForm();
     } catch (submitError) {
@@ -124,32 +126,46 @@ const HighlightsPage = () => {
 
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
     setPhotoError(null);
-    const file = event.target.files?.[0];
-    if (!file) {
-      setPhotoPreview(null);
-      setPhotoName(null);
+    const files = Array.from(event.target.files ?? []);
+
+    if (!files.length) {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
+    const availableSlots = 3 - photoPreviews.length;
+    if (availableSlots <= 0) {
+      setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
+      event.target.value = '';
+      return;
+    }
+
+    const filesToProcess = files.slice(0, availableSlots);
+    const invalidFile = filesToProcess.find((file) => !file.type.startsWith('image/'));
+    if (invalidFile) {
       setPhotoError('Bitte wähle eine Bilddatei aus.');
       event.target.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setPhotoPreview(reader.result);
-        setPhotoName(file.name);
-      }
-    };
-    reader.readAsDataURL(file);
+    filesToProcess.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setPhotoPreviews((prev) => [...prev, reader.result as string]);
+          setPhotoNames((prev) => [...prev, file.name]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (files.length > filesToProcess.length) {
+      setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
+    }
   };
 
-  const removePhoto = () => {
-    setPhotoPreview(null);
-    setPhotoName(null);
+  const removePhoto = (index: number) => {
+    setPhotoPreviews((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    setPhotoNames((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
     setPhotoError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -166,8 +182,13 @@ const HighlightsPage = () => {
     if (firefox) {
       setFirefoxDateInput(formatDateForDisplay(highlight.date));
     }
-    setPhotoPreview(highlight.photoUrl ?? null);
-    setPhotoName(highlight.photoUrl ? 'Gespeichertes Foto' : null);
+    const photos = highlight.photos?.length
+      ? highlight.photos
+      : highlight.photoUrl
+        ? [highlight.photoUrl]
+        : [];
+    setPhotoPreviews(photos);
+    setPhotoNames(photos.map(() => 'Gespeichertes Foto'));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -249,31 +270,42 @@ const HighlightsPage = () => {
           <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/60 p-3">
             <label className="block text-sm font-medium text-slate-200">
               Foto (optional)
-              <p className="text-xs text-slate-400">Lade ein Bild zu deinem Highlight hoch.</p>
+              <p className="text-xs text-slate-400">Lade ein Bild zu deinem Highlight hoch. Maximal 3 Dateien.</p>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handlePhotoChange}
                 className="mt-1 block w-full text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-brand-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-brand-secondary/90"
               />
             </label>
-            {photoName && <p className="text-xs text-slate-300">Ausgewählt: {photoName}</p>}
-            {photoPreview && (
-              <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40">
-                <img
-                  src={photoPreview}
-                  alt={title ? `Foto zu ${title}` : 'Highlight-Foto'}
-                  className="max-h-64 w-full object-cover"
-                />
+            {photoNames.length > 0 && (
+              <ul className="text-xs text-slate-300">
+                {photoNames.map((name, index) => (
+                  <li key={`${name}-${index}`}>{name}</li>
+                ))}
+              </ul>
+            )}
+            {photoPreviews.length > 0 && (
+              <div className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2 sm:grid-cols-2">
+                {photoPreviews.map((photo, index) => (
+                  <div key={`${photo}-${index}`} className="space-y-2">
+                    <div className="overflow-hidden rounded-md bg-slate-950">
+                      <img
+                        src={photo}
+                        alt={title ? `Foto zu ${title}` : 'Highlight-Foto'}
+                        className="max-h-56 w-full object-contain"
+                      />
+                    </div>
+                    <Button type="button" variant="ghost" onClick={() => removePhoto(index)}>
+                      Foto entfernen
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              {photoPreview && (
-                <Button type="button" variant="ghost" onClick={removePhoto}>
-                  Foto entfernen
-                </Button>
-              )}
               {photoError && <p className="text-xs text-red-400">{photoError}</p>}
             </div>
           </div>

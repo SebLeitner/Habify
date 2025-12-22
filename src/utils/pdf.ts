@@ -5,7 +5,16 @@ const PAGE_HEIGHT = 842;
 
 type RgbColor = [number, number, number];
 
-export type PdfPage = string[] | { contentStream: string };
+export type PdfImage = {
+  name?: string;
+  width: number;
+  height: number;
+  data: Uint8Array;
+};
+
+type PdfPageContent = { contentStream: string; images?: PdfImage[] };
+
+export type PdfPage = string[] | PdfPageContent;
 
 export const wrapText = (text: string, maxChars = 90) => {
   const words = text.split(/\s+/);
@@ -41,6 +50,26 @@ const escapePdfText = (text: string) => {
       return char;
     })
     .join('');
+};
+
+const bytesToBinaryString = (data: Uint8Array) => {
+  let result = '';
+  data.forEach((byte) => {
+    result += String.fromCharCode(byte);
+  });
+  return result;
+};
+
+const buildTextCommand = (text: string, fontSize: number, x: number, y: number, color: RgbColor = [0, 0, 0]) => {
+  const escaped = escapePdfText(text);
+  return [
+    'BT',
+    `${color[0]} ${color[1]} ${color[2]} rg`,
+    `/F1 ${fontSize} Tf`,
+    `${x.toFixed(2)} ${y.toFixed(2)} Td`,
+    `(${escaped}) Tj`,
+    'ET',
+  ].join('\n');
 };
 
 export const buildPdfPages = (lines: string[]): PdfPage[] => {
@@ -105,6 +134,59 @@ export const createCoverPage = (options: {
   return { contentStream } satisfies PdfPage;
 };
 
+export type PdfLayoutBlock =
+  | { type: 'text'; text: string; fontSize?: number; color?: RgbColor; marginBottom?: number; lineHeight?: number }
+  | { type: 'image'; image: PdfImage; marginBottom?: number };
+
+export const buildMixedPdfPages = (blocks: PdfLayoutBlock[], margin = PDF_MARGIN): PdfPage[] => {
+  if (!blocks.length) {
+    return [];
+  }
+
+  const pages: PdfPageContent[] = [];
+  let cursorY = PAGE_HEIGHT - margin;
+  let commands: string[] = [];
+  let images: PdfImage[] = [];
+
+  const flushPage = () => {
+    if (!commands.length && !images.length) return;
+    pages.push({ contentStream: commands.join('\n'), images });
+    cursorY = PAGE_HEIGHT - margin;
+    commands = [];
+    images = [];
+  };
+
+  blocks.forEach((block) => {
+    const blockHeight = block.type === 'text' ? block.lineHeight ?? PDF_LINE_HEIGHT : block.image.height;
+    const marginBottom = block.marginBottom ?? 6;
+
+    if (cursorY - blockHeight < margin) {
+      flushPage();
+    }
+
+    if (block.type === 'text') {
+      const fontSize = block.fontSize ?? 12;
+      const lineHeight = block.lineHeight ?? PDF_LINE_HEIGHT;
+      const y = cursorY - lineHeight + lineHeight - fontSize + 4;
+      commands.push(buildTextCommand(block.text, fontSize, PDF_MARGIN, y, block.color ?? [0, 0, 0]));
+    } else {
+      const imageName = block.image.name ?? `Im${images.length + 1}`;
+      const x = Math.max(margin, (PAGE_WIDTH - block.image.width) / 2);
+      const y = cursorY - block.image.height;
+      commands.push(
+        `q\n${block.image.width.toFixed(2)} 0 0 ${block.image.height.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm\n/${imageName} Do\nQ`,
+      );
+      images.push({ ...block.image, name: imageName });
+    }
+
+    cursorY -= blockHeight + marginBottom;
+  });
+
+  flushPage();
+
+  return pages;
+};
+
 const generatePdf = (pages: PdfPage[]) => {
   const objects: string[] = [];
   const addObject = (content: string) => {
@@ -113,18 +195,36 @@ const generatePdf = (pages: PdfPage[]) => {
   };
 
   const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
-  const contentIds = pages.map((pageLines) => {
+  const contentIds: number[] = [];
+  const xObjectsPerPage: { name: string; objectId: number }[][] = [];
+
+  pages.forEach((pageLines) => {
+    const images = Array.isArray(pageLines) ? [] : pageLines.images ?? [];
+    const xObjects = images.map((image, index) => {
+      const name = image.name ?? `Im${index + 1}`;
+      const binary = bytesToBinaryString(image.data);
+      const objectId = addObject(
+        `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.data.length} >>\nstream\n${binary}\nendstream`,
+      );
+      return { name, objectId };
+    });
+    xObjectsPerPage.push(xObjects);
+
     const stream = Array.isArray(pageLines) ? createPdfContentStream(pageLines) : pageLines.contentStream;
     const length = stream.length;
-    return addObject(`<< /Length ${length} >>\nstream\n${stream}\nendstream`);
+    contentIds.push(addObject(`<< /Length ${length} >>\nstream\n${stream}\nendstream`));
   });
 
   const pagesId = addObject(''); // placeholder
 
   const pageIds = pages.map((_, index) => {
-    const pageObj = `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Contents ${
-      contentIds[index]
-    } 0 R /Resources << /Font << /F1 ${fontId} 0 R >> >> >>`;
+    const xObjects = xObjectsPerPage[index];
+    const xObjectEntry =
+      xObjects.length > 0
+        ? `/XObject << ${xObjects.map((item) => `/${item.name} ${item.objectId} 0 R`).join(' ')} >>`
+        : '';
+    const resources = `/Resources << /Font << /F1 ${fontId} 0 R >>${xObjectEntry ? ` ${xObjectEntry}` : ''} >>`;
+    const pageObj = `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Contents ${contentIds[index]} 0 R ${resources} >>`;
     return addObject(pageObj);
   });
 
