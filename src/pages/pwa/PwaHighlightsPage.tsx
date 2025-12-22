@@ -356,13 +356,6 @@ const PwaHighlightsPage = () => {
     setModalDate(selectedDate);
   };
 
-  const estimateDataUrlSize = (dataUrl: string) => {
-    const base64 = dataUrl.split(',')[1];
-    if (!base64) return 0;
-    const padding = (base64.match(/=*$/)?.[0].length ?? 0);
-    return (base64.length * 3) / 4 - padding;
-  };
-
   const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     setPhotoError(null);
     const file = event.target.files?.[0];
@@ -387,16 +380,7 @@ const PwaHighlightsPage = () => {
     }
 
     try {
-      const compressed = await compressImageFile(file);
-      const estimatedSize = estimateDataUrlSize(compressed.dataUrl);
-      if (estimatedSize > MAX_PHOTO_SIZE_BYTES) {
-        setPhotoError('Foto ist zu groß. Bitte wähle eine kleinere Datei.');
-        setPendingPhoto(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        return;
-      }
+      const compressed = await compressImageFile(file, { maxSizeBytes: MAX_PHOTO_SIZE_BYTES });
       setPendingPhoto(compressed);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -419,13 +403,6 @@ const PwaHighlightsPage = () => {
 
     if (!pendingPhoto) {
       setPhotoError('Bitte wähle ein Foto aus, das hochgeladen werden soll.');
-      return;
-    }
-
-    const estimatedSize = estimateDataUrlSize(pendingPhoto.dataUrl);
-    if (estimatedSize > MAX_PHOTO_SIZE_BYTES) {
-      setPhotoError('Foto ist zu groß. Bitte wähle eine kleinere Datei.');
-      setPendingPhoto(null);
       return;
     }
 
