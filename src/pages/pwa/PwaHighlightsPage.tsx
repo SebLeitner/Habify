@@ -25,6 +25,7 @@ const PwaHighlightsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [photoNames, setPhotoNames] = useState<string[]>([]);
+  const [pendingPhoto, setPendingPhoto] = useState<{ dataUrl: string; name: string } | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -113,6 +114,7 @@ const PwaHighlightsPage = () => {
     setEditingHighlightId(null);
     setPhotoPreviews([]);
     setPhotoNames([]);
+    setPendingPhoto(null);
     setPhotoError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -177,6 +179,7 @@ const PwaHighlightsPage = () => {
     const photos = resolveHighlightPhotos(highlight);
     setPhotoPreviews(photos);
     setPhotoNames(photos.map(() => 'Gespeichertes Foto'));
+    setPendingPhoto(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -352,46 +355,59 @@ const PwaHighlightsPage = () => {
 
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
     setPhotoError(null);
-    const files = Array.from(event.target.files ?? []);
+    const file = event.target.files?.[0];
 
-    if (!files.length) {
+    if (!file) {
+      setPendingPhoto(null);
       return;
     }
 
-    const availableSlots = 3 - photoPreviews.length;
-    if (availableSlots <= 0) {
+    if (photoPreviews.length >= 3) {
       setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
       event.target.value = '';
+      setPendingPhoto(null);
       return;
     }
 
-    const filesToProcess = files.slice(0, availableSlots);
-    const invalidFile = filesToProcess.find((file) => !file.type.startsWith('image/'));
-    if (invalidFile) {
+    if (!file.type.startsWith('image/')) {
       setPhotoError('Bitte wähle eine gültige Bilddatei aus.');
       event.target.value = '';
+      setPendingPhoto(null);
       return;
     }
 
-    filesToProcess.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setPhotoPreviews((prev) => [...prev, reader.result as string]);
-          setPhotoNames((prev) => [...prev, file.name]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPendingPhoto({ dataUrl: reader.result as string, name: file.name });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
-    if (files.length > filesToProcess.length) {
+  const handleUploadSelectedPhoto = () => {
+    if (photoPreviews.length >= 3) {
       setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
+      return;
+    }
+
+    if (!pendingPhoto) {
+      setPhotoError('Bitte wähle ein Foto aus, das hochgeladen werden soll.');
+      return;
+    }
+
+    setPhotoPreviews((prev) => [...prev, pendingPhoto.dataUrl]);
+    setPhotoNames((prev) => [...prev, pendingPhoto.name]);
+    setPendingPhoto(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   const removePhoto = (index: number) => {
     setPhotoPreviews((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
     setPhotoNames((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+    setPendingPhoto(null);
     setPhotoError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -461,19 +477,45 @@ const PwaHighlightsPage = () => {
                         ref={textAreaRef}
                         required
                       />
-                      <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+                      <div className="space-y-3 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
                         <label className="block text-sm font-medium text-slate-200">
                           Foto (optional)
-                          <p className="text-xs text-slate-400">Füge optional ein Foto hinzu. Maximal 3 Dateien.</p>
+                          <p className="text-xs text-slate-400">
+                            Füge Fotos nacheinander hinzu. Wähle eine Datei aus und lade sie dann über den Button
+                            hoch. Maximal 3 Dateien.
+                          </p>
                           <input
                             ref={fileInputRef}
                             type="file"
                             accept="image/*"
-                            multiple
                             onChange={handlePhotoChange}
                             className="mt-1 block w-full text-sm text-slate-200 file:mr-3 file:rounded-md file:border-0 file:bg-brand-secondary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-brand-secondary/90"
                           />
                         </label>
+                        <div className="flex flex-col gap-2 rounded-lg border border-slate-800/80 bg-slate-950/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="text-xs text-slate-300">
+                            {pendingPhoto ? (
+                              <div className="flex items-center gap-3">
+                                <div className="h-14 w-20 overflow-hidden rounded-md bg-slate-900">
+                                  <img
+                                    src={pendingPhoto.dataUrl}
+                                    alt="Ausgewähltes Foto"
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-slate-200">{pendingPhoto.name}</p>
+                                  <p className="text-slate-400">Ausgewählt – zum Hinzufügen auf „Foto hochladen" tippen.</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-slate-400">Noch kein neues Foto ausgewählt.</p>
+                            )}
+                          </div>
+                          <Button type="button" variant="secondary" onClick={handleUploadSelectedPhoto}>
+                            Foto hochladen
+                          </Button>
+                        </div>
                         {photoNames.length > 0 && (
                           <ul className="text-xs text-slate-300">
                             {photoNames.map((name, index) => (
