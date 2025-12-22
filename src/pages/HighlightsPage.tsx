@@ -12,6 +12,7 @@ import { isFirefox } from '../utils/browser';
 import { compressImageFile } from '../utils/image';
 
 const todayAsString = () => format(new Date(), 'yyyy-MM-dd');
+const MAX_PHOTO_SIZE_BYTES = 360 * 1024; // DynamoDB Item limit is 400 KB – stay below to be safe
 
 const HighlightsPage = () => {
   const { state, addHighlight, deleteHighlight, updateHighlight, isLoading, error } = useData();
@@ -149,7 +150,9 @@ const HighlightsPage = () => {
     }
 
     try {
-      const compressedFiles = await Promise.all(filesToProcess.map((file) => compressImageFile(file)));
+      const compressedFiles = await Promise.all(
+        filesToProcess.map((file) => compressImageFile(file, { maxSizeBytes: MAX_PHOTO_SIZE_BYTES })),
+      );
       setPhotoPreviews((prev) => [...prev, ...compressedFiles.map((file) => file.dataUrl)]);
       setPhotoNames((prev) => [...prev, ...compressedFiles.map((file) => file.name)]);
     } catch (processingError) {

@@ -2,6 +2,9 @@ export type CompressImageOptions = {
   maxWidth?: number;
   maxHeight?: number;
   quality?: number;
+  maxSizeBytes?: number;
+  minQuality?: number;
+  resizeStep?: number;
 };
 
 const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> =>
@@ -12,9 +15,23 @@ const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> =>
     image.src = dataUrl;
   });
 
+const estimateDataUrlSize = (dataUrl: string) => {
+  const base64 = dataUrl.split(',')[1];
+  if (!base64) return 0;
+  const padding = (base64.match(/=*$/)?.[0].length ?? 0);
+  return (base64.length * 3) / 4 - padding;
+};
+
 export const compressImageFile = async (
   file: File,
-  { maxWidth = 1600, maxHeight = 1600, quality = 0.85 }: CompressImageOptions = {},
+  {
+    maxWidth = 1600,
+    maxHeight = 1600,
+    quality = 0.85,
+    maxSizeBytes,
+    minQuality = 0.5,
+    resizeStep = 0.9,
+  }: CompressImageOptions = {},
 ): Promise<{ dataUrl: string; name: string }> => {
   const reader = new FileReader();
 
@@ -30,24 +47,57 @@ export const compressImageFile = async (
     reader.readAsDataURL(file);
   });
 
-  const image = await loadImageFromDataUrl(originalDataUrl);
-  const scale = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight, 1);
+  let currentMaxWidth = maxWidth;
+  let currentMaxHeight = maxHeight;
+  let currentQuality = quality;
 
-  const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
-  const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+  const compressWithSettings = async () => {
+    const image = await loadImageFromDataUrl(originalDataUrl);
+    const scale = Math.min(currentMaxWidth / image.naturalWidth, currentMaxHeight / image.naturalHeight, 1);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
+    const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
+    const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
 
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('Foto konnte nicht verarbeitet werden.');
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Foto konnte nicht verarbeitet werden.');
+    }
+
+    context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+    return canvas.toDataURL('image/jpeg', currentQuality);
+  };
+
+  let compressedDataUrl = await compressWithSettings();
+
+  if (!maxSizeBytes) {
+    return { dataUrl: compressedDataUrl, name: file.name };
   }
 
-  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+  const maxAttempts = 10;
+  let attempts = 0;
+  let estimatedSize = estimateDataUrlSize(compressedDataUrl);
 
-  const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+  while (estimatedSize > maxSizeBytes && attempts < maxAttempts) {
+    if (currentQuality > minQuality) {
+      currentQuality = Math.max(minQuality, currentQuality - 0.1);
+    } else {
+      currentMaxWidth = Math.max(300, Math.round(currentMaxWidth * resizeStep));
+      currentMaxHeight = Math.max(300, Math.round(currentMaxHeight * resizeStep));
+    }
+
+    compressedDataUrl = await compressWithSettings();
+    estimatedSize = estimateDataUrlSize(compressedDataUrl);
+    attempts += 1;
+  }
+
+  if (estimatedSize > maxSizeBytes) {
+    throw new Error('Foto konnte nicht verarbeitet werden.');
+  }
 
   return { dataUrl: compressedDataUrl, name: file.name };
 };
