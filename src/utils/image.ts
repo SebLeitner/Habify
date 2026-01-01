@@ -5,6 +5,7 @@ export type CompressImageOptions = {
   maxSizeBytes?: number;
   minQuality?: number;
   resizeStep?: number;
+  minDimension?: number;
 };
 
 const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> =>
@@ -31,6 +32,7 @@ export const compressImageFile = async (
     maxSizeBytes,
     minQuality = 0.5,
     resizeStep = 0.9,
+    minDimension = 200,
   }: CompressImageOptions = {},
 ): Promise<{ dataUrl: string; name: string }> => {
   const reader = new FileReader();
@@ -78,7 +80,7 @@ export const compressImageFile = async (
     return { dataUrl: compressedDataUrl, name: file.name };
   }
 
-  const maxAttempts = 10;
+  const maxAttempts = 15;
   let attempts = 0;
   let estimatedSize = estimateDataUrlSize(compressedDataUrl);
 
@@ -86,13 +88,23 @@ export const compressImageFile = async (
     if (currentQuality > minQuality) {
       currentQuality = Math.max(minQuality, currentQuality - 0.1);
     } else {
-      currentMaxWidth = Math.max(300, Math.round(currentMaxWidth * resizeStep));
-      currentMaxHeight = Math.max(300, Math.round(currentMaxHeight * resizeStep));
+      currentMaxWidth = Math.max(minDimension, Math.round(currentMaxWidth * resizeStep));
+      currentMaxHeight = Math.max(minDimension, Math.round(currentMaxHeight * resizeStep));
     }
 
     compressedDataUrl = await compressWithSettings();
     estimatedSize = estimateDataUrlSize(compressedDataUrl);
     attempts += 1;
+  }
+
+  if (estimatedSize > maxSizeBytes) {
+    const scaleRatio = Math.min(0.95, Math.sqrt(maxSizeBytes / estimatedSize));
+    if (Number.isFinite(scaleRatio) && scaleRatio > 0) {
+      currentMaxWidth = Math.max(100, Math.round(currentMaxWidth * scaleRatio));
+      currentMaxHeight = Math.max(100, Math.round(currentMaxHeight * scaleRatio));
+      compressedDataUrl = await compressWithSettings();
+      estimatedSize = estimateDataUrlSize(compressedDataUrl);
+    }
   }
 
   if (estimatedSize > maxSizeBytes) {
