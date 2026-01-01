@@ -12,7 +12,7 @@ import {
 } from '../../utils/datetime';
 import { isFirefox } from '../../utils/browser';
 import { buildMixedPdfPages, createCoverPage, downloadPdf, PdfImage, PdfLayoutBlock, wrapText } from '../../utils/pdf';
-import { compressImageFile } from '../../utils/image';
+import { compressImageFile, estimateDataUrlSize } from '../../utils/image';
 
 const PwaHighlightsPage = () => {
   const { state, addHighlight, updateHighlight, deleteHighlight, isLoading, error } = useData();
@@ -38,7 +38,11 @@ const PwaHighlightsPage = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const MAX_PHOTO_SIZE_BYTES = 360 * 1024; // DynamoDB Item limit is 400 KB – stay below to be safe
+  const estimatePhotoBytes = (photos: string[]) =>
+    photos.reduce((total, photo) => total + estimateDataUrlSize(photo), 0);
+
+  const MAX_PHOTO_SIZE_BYTES = 360 * 1024; // Hard limit for individual photos.
+  const MAX_TOTAL_PHOTO_BYTES = 320 * 1024; // Keep the full highlight item safely below DynamoDB limits.
 
   const PDF_MAX_IMAGE_WIDTH = (15 / 2.54) * 72; // 15 cm in PDF points
   const PDF_MAX_IMAGE_HEIGHT = (8 / 2.54) * 72; // 8 cm in PDF points
@@ -132,6 +136,11 @@ const PwaHighlightsPage = () => {
 
     if (!trimmedTitle || !trimmedText || !date) {
       setFormError('Alle Felder ausfüllen – Speichern nur mit aktiver Backend-Verbindung.');
+      return;
+    }
+
+    if (estimatePhotoBytes(photos) > MAX_TOTAL_PHOTO_BYTES) {
+      setFormError('Die Fotos sind zusammen zu groß. Bitte entferne ein Foto oder wähle kleinere Dateien.');
       return;
     }
 
@@ -380,7 +389,22 @@ const PwaHighlightsPage = () => {
     }
 
     try {
-      const compressed = await compressImageFile(file, { maxSizeBytes: MAX_PHOTO_SIZE_BYTES });
+      const remainingBytes = MAX_TOTAL_PHOTO_BYTES - estimatePhotoBytes(photoPreviews);
+      if (remainingBytes <= 0) {
+        setPhotoError('Es können keine weiteren Fotos hinzugefügt werden (Größenlimit erreicht).');
+        event.target.value = '';
+        setPendingPhoto(null);
+        return;
+      }
+      const compressed = await compressImageFile(file, {
+        maxSizeBytes: Math.min(MAX_PHOTO_SIZE_BYTES, remainingBytes),
+      });
+      if (estimateDataUrlSize(compressed.dataUrl) > remainingBytes) {
+        setPhotoError('Das Foto ist zu groß. Bitte wähle eine kleinere Datei.');
+        event.target.value = '';
+        setPendingPhoto(null);
+        return;
+      }
       setPendingPhoto(compressed);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -403,6 +427,12 @@ const PwaHighlightsPage = () => {
 
     if (!pendingPhoto) {
       setPhotoError('Bitte wähle ein Foto aus, das hochgeladen werden soll.');
+      return;
+    }
+
+    const remainingBytes = MAX_TOTAL_PHOTO_BYTES - estimatePhotoBytes(photoPreviews);
+    if (estimateDataUrlSize(pendingPhoto.dataUrl) > remainingBytes) {
+      setPhotoError('Das Foto ist zu groß. Bitte wähle eine kleinere Datei.');
       return;
     }
 
