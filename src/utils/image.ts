@@ -15,7 +15,7 @@ const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> =>
     image.src = dataUrl;
   });
 
-const estimateDataUrlSize = (dataUrl: string) => {
+export const estimateDataUrlSize = (dataUrl: string) => {
   const base64 = dataUrl.split(',')[1];
   if (!base64) return 0;
   const padding = (base64.match(/=*$/)?.[0].length ?? 0);

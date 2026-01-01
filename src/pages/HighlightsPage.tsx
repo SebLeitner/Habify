@@ -9,10 +9,11 @@ import Spinner from '../components/UI/Spinner';
 import { DailyHighlight, useData } from '../contexts/DataContext';
 import { formatDateForDisplay, parseDisplayDateToISO } from '../utils/datetime';
 import { isFirefox } from '../utils/browser';
-import { compressImageFile } from '../utils/image';
+import { compressImageFile, estimateDataUrlSize } from '../utils/image';
 
 const todayAsString = () => format(new Date(), 'yyyy-MM-dd');
-const MAX_PHOTO_SIZE_BYTES = 360 * 1024; // DynamoDB Item limit is 400 KB – stay below to be safe
+const MAX_PHOTO_SIZE_BYTES = 360 * 1024; // Hard limit for individual photos.
+const MAX_TOTAL_PHOTO_BYTES = 320 * 1024; // Keep the full highlight item safely below DynamoDB limits.
 
 const HighlightsPage = () => {
   const { state, addHighlight, deleteHighlight, updateHighlight, isLoading, error } = useData();
@@ -31,6 +32,9 @@ const HighlightsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingHighlightId, setEditingHighlightId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const estimatePhotoBytes = (photos: string[]) =>
+    photos.reduce((total, photo) => total + estimateDataUrlSize(photo), 0);
 
   const resetForm = (nextDate = date) => {
     setTitle('');
@@ -100,6 +104,11 @@ const HighlightsPage = () => {
       return;
     }
 
+    if (estimatePhotoBytes(photos) > MAX_TOTAL_PHOTO_BYTES) {
+      setFormError('Die Fotos sind zusammen zu groß. Bitte entferne ein Foto oder wähle kleinere Dateien.');
+      return;
+    }
+
     setFormError(null);
     setIsSubmitting(true);
     try {
@@ -149,12 +158,35 @@ const HighlightsPage = () => {
       return;
     }
 
+    let remainingBytes = MAX_TOTAL_PHOTO_BYTES - estimatePhotoBytes(photoPreviews);
+    if (remainingBytes <= 0) {
+      setPhotoError('Es können keine weiteren Fotos hinzugefügt werden (Größenlimit erreicht).');
+      event.target.value = '';
+      return;
+    }
+
+    const nextPreviews: string[] = [];
+    const nextNames: string[] = [];
+    let failedToAdd = false;
+
     try {
-      const compressedFiles = await Promise.all(
-        filesToProcess.map((file) => compressImageFile(file, { maxSizeBytes: MAX_PHOTO_SIZE_BYTES })),
-      );
-      setPhotoPreviews((prev) => [...prev, ...compressedFiles.map((file) => file.dataUrl)]);
-      setPhotoNames((prev) => [...prev, ...compressedFiles.map((file) => file.name)]);
+      for (const file of filesToProcess) {
+        if (remainingBytes <= 0) {
+          failedToAdd = true;
+          break;
+        }
+        const compressed = await compressImageFile(file, {
+          maxSizeBytes: Math.min(MAX_PHOTO_SIZE_BYTES, remainingBytes),
+        });
+        const compressedSize = estimateDataUrlSize(compressed.dataUrl);
+        if (compressedSize > remainingBytes) {
+          failedToAdd = true;
+          continue;
+        }
+        nextPreviews.push(compressed.dataUrl);
+        nextNames.push(compressed.name);
+        remainingBytes -= compressedSize;
+      }
     } catch (processingError) {
       console.error('Foto konnte nicht verarbeitet werden', processingError);
       setPhotoError('Fotos konnten nicht verarbeitet werden. Bitte versuche es erneut.');
@@ -162,8 +194,15 @@ const HighlightsPage = () => {
       return;
     }
 
+    if (nextPreviews.length) {
+      setPhotoPreviews((prev) => [...prev, ...nextPreviews]);
+      setPhotoNames((prev) => [...prev, ...nextNames]);
+    }
+
     if (files.length > filesToProcess.length) {
       setPhotoError('Es können maximal 3 Fotos hinzugefügt werden.');
+    } else if (failedToAdd) {
+      setPhotoError('Einige Fotos waren zu groß. Bitte wähle kleinere Dateien.');
     }
 
     if (fileInputRef.current) {
