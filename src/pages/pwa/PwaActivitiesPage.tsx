@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useMemo, useState } from 'react';
 import { differenceInCalendarDays, endOfDay, isWithinInterval, startOfDay, subDays } from 'date-fns';
+import { useSearchParams } from 'react-router-dom';
 import WeeklyActivityOverview from '../../components/Log/WeeklyActivityOverview';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
@@ -163,6 +164,7 @@ const extractDismissalsForToday = (logs: LogEntry[]) => {
 
 const PwaActivitiesPage = () => {
   const { state, addLog, isLoading, error } = useData();
+  const [searchParams] = useSearchParams();
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingLog, setPendingLog] = useState<{
@@ -291,22 +293,24 @@ const PwaActivitiesPage = () => {
     return targets;
   }, [dismissalsForToday, state.activities, state.logs]);
 
-  const { dailyHabits, regularActivities } = useMemo(() => {
+  const { dailyHabits, dailyConfiguredHabits, regularActivities } = useMemo(() => {
     const dailyHabitIds = new Set<string>();
-    const daily = activities.filter((activity) => {
+    const dailyConfigured = activities.filter((activity) => {
       const target = dailyTargets.get(activity.id);
-      const isDaily =
-        (target?.totalTarget ?? 0) > 0 &&
-        (target?.totalRemainingAfterDismissals ?? target?.totalRemaining ?? 0) > 0;
-      if (isDaily) {
-        dailyHabitIds.add(activity.id);
-      }
-      return isDaily;
+      const isDaily = (target?.totalTarget ?? 0) > 0;
+      if (!isDaily) return false;
+
+      dailyHabitIds.add(activity.id);
+      return true;
     });
 
     const regular = activities.filter((activity) => !dailyHabitIds.has(activity.id));
+    const dailyDue = dailyConfigured.filter((activity) => {
+      const target = dailyTargets.get(activity.id);
+      return (target?.totalRemainingAfterDismissals ?? target?.totalRemaining ?? 0) > 0;
+    });
 
-    return { dailyHabits: daily, regularActivities: regular };
+    return { dailyHabits: dailyDue, dailyConfiguredHabits: dailyConfigured, regularActivities: regular };
   }, [activities, dailyTargets]);
 
   const activityStats = useMemo(() => {
@@ -334,13 +338,17 @@ const PwaActivitiesPage = () => {
     return stats;
   }, [state.logs]);
 
-  const morningHabits = dailyHabits.filter(
-    (activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.morning ?? 0) > 0,
-  );
-  const dayHabits = dailyHabits.filter((activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.day ?? 0) > 0);
-  const eveningHabits = dailyHabits.filter(
-    (activity) => (dailyTargets.get(activity.id)?.remainingAfterDismissals.evening ?? 0) > 0,
-  );
+  const isDailyView = searchParams.get('view') === 'daily';
+  const dailyActivitiesForView = isDailyView ? dailyConfiguredHabits : dailyHabits;
+
+  const getNextDismissSlot = (activityId: string) => {
+    const remaining = dailyTargets.get(activityId)?.remainingAfterDismissals;
+    if (!remaining) return null;
+    if (remaining.morning > 0) return 'morning';
+    if (remaining.day > 0) return 'day';
+    if (remaining.evening > 0) return 'evening';
+    return null;
+  };
 
   const handleLogMindfulness = async () => {
     if (!mindfulnessOfDay) return;
@@ -444,149 +452,158 @@ const PwaActivitiesPage = () => {
         <p className="text-sm text-slate-400">Keine Aktivitäten vorhanden.</p>
       ) : (
         <div className="space-y-6">
-          {!!dailyHabits.length && (
+          {!!dailyActivitiesForView.length && (
             <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-white">Daily Habits</h2>
-              {[
-                { key: 'morning' as const, title: 'Morgens', activities: morningHabits },
-                { key: 'day' as const, title: 'Mittags/Nachmittags', activities: dayHabits },
-                { key: 'evening' as const, title: 'Abend', activities: eveningHabits },
-              ]
-                .filter((section) => section.activities.length > 0)
-                .map((section) => (
-                  <div key={section.key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-slate-200">{section.title}</h3>
-                      <span className="text-xs text-slate-400">
-                        {section.activities.length} Habit{section.activities.length === 1 ? '' : 's'} offen
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {section.activities.map((activity) => {
-                        const dailyTarget = dailyTargets.get(activity.id);
-                        const timeSlotBadgeValues = dailyTarget
-                          ? formatTimeSlotBadgeValues(dailyTarget.target, dailyTarget.remainingAfterDismissals)
-                          : null;
-                        return (
-                          <div
-                            key={activity.id}
-                            className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner"
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">
+                  {isDailyView ? 'Daily' : 'Daily Habits'}
+                </h2>
+                <span className="text-xs text-slate-400">
+                  {dailyActivitiesForView.length} Aktivität{dailyActivitiesForView.length === 1 ? '' : 'en'}
+                  {!isDailyView ? ' offen' : ''}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {dailyActivitiesForView.map((activity) => {
+                  const dailyTarget = dailyTargets.get(activity.id);
+                  const timeSlotBadgeValues = dailyTarget
+                    ? formatTimeSlotBadgeValues(dailyTarget.target, dailyTarget.remainingAfterDismissals)
+                    : null;
+                  const dismissSlot = getNextDismissSlot(activity.id);
+                  const isDismissDisabled = !dismissSlot;
+                  return (
+                    <div
+                      key={activity.id}
+                      className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner"
+                    >
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedActivity(activity)}
+                          className="flex w-full items-start gap-3 text-left transition hover:text-white"
+                        >
+                          <span
+                            className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                            style={{ backgroundColor: `${activity.color}33` }}
                           >
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedActivity(activity)}
-                                className="flex w-full items-start gap-3 text-left transition hover:text-white"
-                              >
-                                <span
-                                  className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
-                                  style={{ backgroundColor: `${activity.color}33` }}
-                                >
-                                  {activity.icon}
-                                </span>
-                                <div className="flex-1 space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-base font-semibold text-white">{activity.name}</p>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
-                                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                      Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
-                                    </span>
-                                    <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                                      7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
-                                    </span>
-                                  </div>
-                                  {dailyTarget && timeSlotBadgeValues && (
-                                    <div className="space-y-1 text-[11px] font-semibold">
-                                      <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
-                                        <span
-                                          className="rounded-full bg-slate-800 px-2 py-0.5"
-                                          aria-label={`Morgens: ${timeSlotBadgeValues[0]}, Mittags/Nachmittags: ${timeSlotBadgeValues[1]}, Abends: ${timeSlotBadgeValues[2]}`}
-                                        >
-                                          {timeSlotBadgeValues.join(' ')}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </button>
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
-                                  {getRecencyBadgeLabel(activityStats.get(activity.id)?.lastLog ?? null)}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDismissHabit(activity.id, section.key)}
-                                  className="rounded-lg border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
-                                >
-                                  Pausieren
-                                </button>
-                              </div>
+                            {activity.icon}
+                          </span>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-base font-semibold text-white">{activity.name}</p>
                             </div>
+                            <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                              <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
+                              </span>
+                              <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                                7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
+                              </span>
+                            </div>
+                            {dailyTarget && timeSlotBadgeValues && (
+                              <div className="space-y-1 text-[11px] font-semibold">
+                                <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
+                                  <span
+                                    className="rounded-full bg-slate-800 px-2 py-0.5"
+                                    aria-label={`Morgens: ${timeSlotBadgeValues[0]}, Mittags/Nachmittags: ${timeSlotBadgeValues[1]}, Abends: ${timeSlotBadgeValues[2]}`}
+                                  >
+                                    {timeSlotBadgeValues.join(' ')}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        );
-                      })}
+                        </button>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-200">
+                            {getRecencyBadgeLabel(activityStats.get(activity.id)?.lastLog ?? null)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => dismissSlot && handleDismissHabit(activity.id, dismissSlot)}
+                            className={[
+                              'rounded-lg border px-3 py-2 text-xs font-semibold transition',
+                              isDismissDisabled
+                                ? 'cursor-not-allowed border-slate-900 text-slate-500'
+                                : 'border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-white',
+                            ].join(' ')}
+                            disabled={isDismissDisabled}
+                          >
+                            Pausieren
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+              </div>
             </section>
           )}
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Flex Habits</h2>
-              <p className="text-sm text-slate-400">Alle flexiblen Habits auf einen Blick.</p>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {regularActivities.map((activity) => {
-                const dailyTarget = dailyTargets.get(activity.id);
-                const timeSlotBadgeValues = dailyTarget
-                  ? formatTimeSlotBadgeValues(dailyTarget.target, dailyTarget.remainingAfterDismissals)
-                  : null;
-                return (
-                  <div key={activity.id} className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedActivity(activity)}
-                      className="flex w-full items-start gap-3 text-left transition hover:text-white"
+          {!dailyActivitiesForView.length && isDailyView && (
+            <p className="text-sm text-slate-400">Keine Daily-Aktivitäten vorhanden.</p>
+          )}
+
+          {!isDailyView && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Flex Habits</h2>
+                <p className="text-sm text-slate-400">Alle flexiblen Habits auf einen Blick.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {regularActivities.map((activity) => {
+                  const dailyTarget = dailyTargets.get(activity.id);
+                  const timeSlotBadgeValues = dailyTarget
+                    ? formatTimeSlotBadgeValues(dailyTarget.target, dailyTarget.remainingAfterDismissals)
+                    : null;
+                  return (
+                    <div
+                      key={activity.id}
+                      className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner"
                     >
-                      <span
-                        className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
-                        style={{ backgroundColor: `${activity.color}33` }}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedActivity(activity)}
+                        className="flex w-full items-start gap-3 text-left transition hover:text-white"
                       >
-                        {activity.icon}
-                      </span>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-base font-semibold text-white">{activity.name}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
-                          <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                            Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
-                          </span>
-                          <span className="rounded-full bg-slate-800 px-2 py-0.5">
-                            7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
-                          </span>
-                        </div>
-                        {dailyTarget && timeSlotBadgeValues && (
-                          <div className="space-y-1 text-[11px] font-semibold">
-                            <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
-                              <span
-                                className="rounded-full bg-slate-800 px-2 py-0.5"
-                                aria-label={`Morgens: ${timeSlotBadgeValues[0]}, Mittags/Nachmittags: ${timeSlotBadgeValues[1]}, Abends: ${timeSlotBadgeValues[2]}`}
-                              >
-                                {timeSlotBadgeValues.join(' ')}
-                              </span>
-                            </div>
+                        <span
+                          className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+                          style={{ backgroundColor: `${activity.color}33` }}
+                        >
+                          {activity.icon}
+                        </span>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-base font-semibold text-white">{activity.name}</p>
                           </div>
-                        )}
-                      </div>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+                          <div className="flex flex-wrap gap-2 text-[11px] text-slate-300">
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                              Heute: {activityStats.get(activity.id)?.todayCount ?? 0}
+                            </span>
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5">
+                              7 Tage Streak: {activityStats.get(activity.id)?.weekCount ?? 0}
+                            </span>
+                          </div>
+                          {dailyTarget && timeSlotBadgeValues && (
+                            <div className="space-y-1 text-[11px] font-semibold">
+                              <div className="flex flex-wrap gap-1 text-[10px] text-slate-200">
+                                <span
+                                  className="rounded-full bg-slate-800 px-2 py-0.5"
+                                  aria-label={`Morgens: ${timeSlotBadgeValues[0]}, Mittags/Nachmittags: ${timeSlotBadgeValues[1]}, Abends: ${timeSlotBadgeValues[2]}`}
+                                >
+                                  {timeSlotBadgeValues.join(' ')}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
       )}
 

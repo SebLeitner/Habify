@@ -3,6 +3,7 @@ import { useData } from '../../contexts/DataContext';
 
 const navItems = [
   { to: '/pwa/activities', label: 'Aktivitäten', emoji: '✅' },
+  { to: '/pwa/activities?view=daily', label: 'Daily', emoji: '📅' },
   { to: '/pwa/highlights', label: 'Highlights', emoji: '✨' },
   { to: '/pwa/log', label: 'Log', emoji: '📝' },
 ];
