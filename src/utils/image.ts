@@ -16,12 +16,7 @@ const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> =>
     image.src = dataUrl;
   });
 
-export const estimateDataUrlSize = (dataUrl: string) => {
-  const base64 = dataUrl.split(',')[1];
-  if (!base64) return 0;
-  const padding = (base64.match(/=*$/)?.[0].length ?? 0);
-  return (base64.length * 3) / 4 - padding;
-};
+export const estimateDataUrlSize = (dataUrl: string) => new TextEncoder().encode(dataUrl).length;
 
 export const compressImageFile = async (
   file: File,
